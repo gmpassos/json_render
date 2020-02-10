@@ -1,6 +1,6 @@
 name: json_render
 description: JSON Web Render Framework
-version: 1.0.0
+version: 1.0.1
 homepage: https://github.com/gmpassos/json_render
 
 environment:

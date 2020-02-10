@@ -290,7 +290,7 @@ class URLFiltered {
   final String _label ;
   final String type ;
 
-  URLFiltered(this.url, {this.target, String label , this.type}) : this._label = label ;
+  URLFiltered(this.url, {this.target, String label , this.type}) : _label = label ;
 
   String get label => _label ?? url ;
 
@@ -321,7 +321,9 @@ void _copyElementToClipboard(Element elem) {
 
 ////////////////////////////////////////
 
-DivElement _createClosableContent( JSONRender render, DivElement output , String textOpener , String textCloser , int sizeProvider(), CssStyleDeclaration css ) {
+typedef SizeProvider = int Function() ;
+
+DivElement _createClosableContent( JSONRender render, DivElement output , String textOpener , String textCloser , SizeProvider sizeProvider, CssStyleDeclaration css ) {
   output.style.textAlign = 'left';
 
   var container = createDivInlineBlock() ;
@@ -874,6 +876,7 @@ class TypeTimeMillisRender extends TypeRender {
   }
 
   static final DATE_FORMAT_DATETIME_LOCAL = DateFormat('yyyy-MM-ddTHH:mm:ss', Intl.getCurrentLocale()) ;
+  static final DATE_FORMAT_YYYY_MM_DD_HH_MM_SS = DateFormat('yyyy/MM/dd HH:mm:ss', Intl.getCurrentLocale()) ;
 
   int parseToTimeMillis(String value) {
     if ( value == null ) return null ;
@@ -890,12 +893,12 @@ class TypeTimeMillisRender extends TypeRender {
     var timeMillis = parseTimeMillisInRange(node) ;
     var dateTime = DateTime.fromMillisecondsSinceEpoch(timeMillis).toLocal() ;
 
-    var dateTimeLocal = DATE_FORMAT_DATETIME_LOCAL.format(dateTime) ;
-    
     Element elem ;
     var valueProvider ;
 
     if (render.renderMode == JSONRenderMode.INPUT) {
+      var dateTimeLocal = DATE_FORMAT_DATETIME_LOCAL.format(dateTime) ;
+
       elem = InputElement()
         ..value = dateTimeLocal
         ..type = 'datetime-local'
@@ -903,7 +906,7 @@ class TypeTimeMillisRender extends TypeRender {
       valueProvider = () {
         var time = parseToTimeMillis( (elem as InputElement).value );
 
-        int timeDiff = timeMillis - time ;
+        var timeDiff = timeMillis - time ;
         if (timeDiff > 0 && timeDiff <= 1000) {
           time += timeDiff ;
         }
@@ -912,14 +915,16 @@ class TypeTimeMillisRender extends TypeRender {
       } ;
     }
     else {
-      elem = SpanElement()..text = dateTimeLocal ;
+      var dateTimeStr = DATE_FORMAT_YYYY_MM_DD_HH_MM_SS.format(dateTime) ;
+
+      elem = SpanElement()..text = dateTimeStr ;
 
       elem.onClick.listen( (e) {
         _copyElementToClipboard(elem);
 
         var val = '${ elem.text }' ;
         if ( RegExp(r'^\d+$').hasMatch(val) ) {
-          elem.text = dateTimeLocal ;
+          elem.text = dateTimeStr ;
         }
         else {
           elem.text = '$timeMillis' ;
