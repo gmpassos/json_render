@@ -484,12 +484,14 @@ class TypeImageViewerRender extends TypeMediaRender {
     var w = imageElement.naturalWidth;
     var h = imageElement.naturalHeight;
 
+    /*
     var imageFilter ;
     if (perspectiveFilter != null) {
       imageFilter = (img, w, h) {
         return applyPerspective(imageElement, perspectiveFilter.value, false) ;
       };
     }
+     */
 
     var inputMode = render.isInputRenderMode ;
 
