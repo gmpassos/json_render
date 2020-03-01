@@ -1,6 +1,6 @@
 name: json_render
 description: JSON Web Render Framework
-version: 1.0.1
+version: 1.2.0
 homepage: https://github.com/gmpassos/json_render
 
 environment:
@@ -8,9 +8,9 @@ environment:
 
 dependencies:
   intl: "^0.16.0"
-  mercury_client: ^1.0.6
+  mercury_client: ^1.0.7
     #path: ../mercury_client
-  dom_tools: ^1.0.0
+  dom_tools: ^1.2.0
     #path: ../dom_tools
 
 dev_dependencies:

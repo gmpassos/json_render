@@ -1,12 +1,12 @@
 
-import 'dart:async';
-import 'dart:convert';
+import 'dart:convert' as dart_convert ;
 import 'dart:html';
-import 'dart:math';
 
 import 'package:dom_tools/dom_tools.dart';
 import 'package:intl/intl.dart';
 import 'package:mercury_client/mercury_client.dart';
+
+import 'json_render_media.dart';
 
 enum JSONRenderMode {
   INPUT,
@@ -17,10 +17,10 @@ String convertToJSONAsString(dynamic jsonNode, [String ident = '  ']) {
   if (jsonNode == null) return null;
 
   if ( ident != null && ident.isNotEmpty ) {
-    return JsonEncoder.withIndent('  ').convert( jsonNode ) ;
+    return dart_convert.JsonEncoder.withIndent('  ').convert( jsonNode ) ;
   }
   else {
-    return json.encode( jsonNode ) ;
+    return dart_convert.json.encode( jsonNode ) ;
   }
 }
 
@@ -59,7 +59,29 @@ num normalizeJSONValueNumber(dynamic value) {
   return num.parse(s) ;
 }
 
-typedef _ValueProvider = dynamic Function() ;
+typedef ValueProvider = dynamic Function(dynamic parent) ;
+
+ValueProvider _VALUE_PROVIDER_NULL = (parent) => null ;
+
+class ValueProviderReference {
+
+  ValueProvider _valueProvider ;
+
+  ValueProviderReference(this._valueProvider);
+
+  ValueProvider get valueProvider => _valueProvider;
+
+  set valueProvider(ValueProvider value) {
+    _valueProvider = value;
+  }
+
+  dynamic call(dynamic parent) => _valueProvider(parent);
+
+  ValueProvider asValueProvider() {
+    return (parent) => _valueProvider(parent) ;
+  }
+
+}
 
 class _JSONValueSet {
 
@@ -67,61 +89,70 @@ class _JSONValueSet {
 
   _JSONValueSet( [this.listMode = false] );
 
-  final Map<NodeKey , _ValueProvider> values = {} ;
+  final Map<NodeKey , ValueProvider> values = {} ;
 
-  void put(NodeKey key, _ValueProvider val) {
-    if (key != null && val != null) {
-      values[key] = val ;
+  void put(NodeKey key, ValueProvider val) {
+    if (key != null) {
+      values[key] = val ?? _VALUE_PROVIDER_NULL ;
     }
   }
 
-  String buildJSONAsString() {
-    return convertToJSONAsString( buildJSON() ) ;
+  String buildJSONAsString(dynamic parent) {
+    return convertToJSONAsString( buildJSON(parent) ) ;
   }
 
-  dynamic buildJSON() {
+  dynamic buildJSON(dynamic parent) {
     if (listMode) {
-      return _buildJSONList() ;
+      return _buildJSONList(parent) ;
     }
     else {
-      return _buildJSONObject() ;
+      return _buildJSONObject(parent) ;
     }
   }
 
-  List _buildJSONList() {
+  List _buildJSONList(dynamic parent) {
     var json = [] ;
 
     for (var val in values.values) {
-      json.add( _callValueProvider(val) ) ;
+      var value = _callValueProvider(val, json);
+      json.add( value ) ;
     }
 
     return json ;
   }
 
-  Map _buildJSONObject() {
+  Map _buildJSONObject(dynamic parent) {
     var json = {} ;
 
     for (var entry in values.entries) {
-      json[ entry.key.leafKey ] = ( entry.value() ) ;
+      var value = _callValueProvider(entry.value, json);
+      var leafKey = entry.key.leafKey;
+
+      if ( !json.containsKey( leafKey ) ) {
+        json[ leafKey ] = value ;
+      }
+      else {
+        var prevVal = json[ leafKey ] ;
+        print("[JSONRender] Can't build entry '${ entry.key }' since it's already set! Discarting generated value: <$value> and keeping current value <$prevVal>") ;
+      }
     }
 
     return json ;
   }
 
 
-  dynamic _callValueProvider(_ValueProvider valueProvider) {
-    if (valueProvider == null) return valueProvider ;
+  dynamic _callValueProvider(ValueProvider valueProvider, dynamic parent) {
+    if (valueProvider == null) return null ;
 
-    var value = valueProvider();
+    var value = valueProvider(parent);
     return value ;
   }
 
-  _ValueProvider asValueProvider() {
-    return () => buildJSON() ;
+  ValueProvider asValueProvider() {
+    return (parent) => buildJSON(parent) ;
   }
 
 }
-
 
 class JSONRender {
 
@@ -130,12 +161,27 @@ class JSONRender {
   JSONRender.fromJSON(this._json) ;
 
   JSONRender.fromJSONAsString(String jsonAsString) {
-    _json = json.decode(jsonAsString) ;
+    _json = dart_convert.json.decode(jsonAsString) ;
   }
+
+  dynamic get json {
+    if (_json == null) return null ;
+    if (_json is Map) return Map.unmodifiable(_json) ;
+    if (_json is List) return List.unmodifiable(_json) ;
+    return _json ;
+  }
+
+  Map get jsonObject => json as Map ;
+  List get jsonList => json as List ;
+  num get jsonNumber => _json is String ? _json : '$_json' ;
+  bool get jsonBoolean => _json is bool ? _json : '$_json'.trim().toLowerCase() == 'true' ;
+  String get jsonString => '$_json' ;
 
   JSONRenderMode _renderMode = JSONRenderMode.VIEW ;
 
   JSONRenderMode get renderMode => _renderMode;
+
+  bool get isInputRenderMode => _renderMode == JSONRenderMode.INPUT ;
 
   set renderMode(JSONRenderMode value) {
     if (value == null) return ;
@@ -148,11 +194,11 @@ class JSONRender {
     return output ;
   }
 
-  _ValueProvider _treeValueProvider ;
+  ValueProvider _treeValueProvider ;
 
   dynamic buildJSON() {
     if (_treeValueProvider == null) return null;
-    return _treeValueProvider() ;
+    return _treeValueProvider(null) ;
   }
 
   String buildJSONAsString([String ident = '  ']) {
@@ -164,37 +210,90 @@ class JSONRender {
 
     var nodeKey = NodeKey() ;
 
-    var valueProvider = _render( output , _json , nodeKey ) ;
+    var valueProvider = _render( output , _json , null, nodeKey ) ;
 
     _treeValueProvider = valueProvider ;
   }
 
-  _ValueProvider _render( DivElement output , dynamic node , NodeKey nodeKey ) {
+  ValueProvider _render( DivElement output , dynamic node , dynamic parent, NodeKey nodeKey ) {
     output.style.display = 'inline-block';
 
-    var valueSet = _JSONValueSet() ;
+    _attachActions(output, node, parent, nodeKey);
+
+    bool valid = _validateNode(node, parent, nodeKey) ;
+    if (!valid) return null ;
+
+    var nodeMapping = _mapNode( node , parent, nodeKey ) ;
 
     for (var typeRender in _extendedTypeRenders) {
-      if ( typeRender.matches(node) ) {
-        return _callRender(typeRender, output, node, nodeKey, valueSet) ;
+      if ( typeRender.matches( nodeMapping.nodeMapped ) ) {
+        var valueProvider = _callRender(typeRender, output, nodeMapping.nodeMapped, nodeMapping.nodeOriginal, nodeKey);
+        return nodeMapping.unmapValueProvider(valueProvider) ;
       }
     }
 
     for (var typeRender in _defaultTypeRenders) {
-      if ( typeRender.matches(node) ) {
-        return _callRender(typeRender, output, node, nodeKey, valueSet) ;
+      if ( typeRender.matches( nodeMapping.nodeMapped ) ) {
+        var valueProvider = _callRender(typeRender, output, nodeMapping.nodeMapped, nodeMapping.nodeOriginal, nodeKey);
+        return nodeMapping.unmapValueProvider(valueProvider) ;
       }
     }
 
     return null ;
   }
 
+  dynamic _attachActions(DivElement output, dynamic node, dynamic parent, NodeKey nodeKey) {
+    if ( _typeActions.isEmpty ) return node ;
 
-  _ValueProvider _callRender(TypeRender typeRender, DivElement output, node, NodeKey nodeKey, _JSONValueSet valueSet) {
-    var valueProvider = typeRender.render(this, output, node, nodeKey) ;
-    valueSet.put(nodeKey, valueProvider) ;
+    for (var typeAction in _typeActions) {
+      if ( typeAction.matches(node, parent, nodeKey) ) {
+
+        output.style.cursor = 'pointer' ;
+
+        output.onClick.listen( (e) {
+          typeAction.doAction(node, parent, nodeKey);
+        }) ;
+
+      }
+    }
+
+    return node ;
+  }
+
+  dynamic _validateNode(dynamic node, dynamic parent, NodeKey nodeKey) {
+    if ( ignoreNullNodes && node == null ) return false ;
+
+    if ( _nodeValidators.isEmpty ) return true ;
+
+    for (var validator in _nodeValidators) {
+      if ( validator(node, parent, nodeKey) ) {
+        return true ;
+      }
+    }
+
+    return false ;
+  }
+
+
+  _NodeMapping _mapNode(dynamic node, dynamic parent, NodeKey nodeKey) {
+    if ( _typeMappers.isEmpty ) return _NodeMapping(null, node, node, parent, nodeKey) ;
+
+    for (var typeMapper in _typeMappers) {
+      if ( typeMapper.matches(node, parent, nodeKey) ) {
+        var nodeMapped = typeMapper.map(node, parent, nodeKey);
+        return _NodeMapping(typeMapper, node, nodeMapped, parent, nodeKey) ;
+      }
+    }
+
+    return _NodeMapping(null, node, node, parent, nodeKey) ;
+  }
+
+  ValueProvider _callRender(TypeRender typeRender, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
+    var valueProvider = typeRender.render(this, output, node, nodeOriginal, nodeKey) ;
     return valueProvider ;
   }
+
+  ////
 
   List<TypeRender> get allRenders => [ ..._extendedTypeRenders , ..._defaultTypeRenders ] ;
 
@@ -237,6 +336,73 @@ class JSONRender {
     return null ;
   }
 
+  ////
+
+  bool _ignoreNullNodes = false ;
+
+  bool get ignoreNullNodes => _ignoreNullNodes;
+
+  set ignoreNullNodes(bool value) {
+    _ignoreNullNodes = value ?? false ;
+  }
+
+  final List<NodeValidator> _nodeValidators = [] ;
+
+  bool addNodeValidator(NodeValidator validator) {
+    if (validator == null || _nodeValidators.contains(validator)) return false ;
+    _nodeValidators.add(validator) ;
+    return true ;
+  }
+
+  void addAllNodeValidator( List<NodeValidator> validators ) {
+    validators.forEach( addNodeValidator ) ;
+  }
+
+  bool removeNodeValidator(NodeValidator validator) {
+    if (validator == null ) return false ;
+    return _nodeValidators.remove(validator) ;
+  }
+
+  ////
+
+  final List<TypeMapper> _typeMappers = [] ;
+
+  bool addTypeMapper(TypeMapper typeMapper) {
+    if (typeMapper == null || _typeMappers.contains(typeMapper)) return false ;
+    _typeMappers.add(typeMapper) ;
+    return true ;
+  }
+
+  void addAllTypeMapper( List<TypeMapper> typeMappers ) {
+    typeMappers.forEach(  addTypeMapper ) ;
+  }
+
+  bool removeTypeMapper(TypeMapper typeMapper) {
+    if (typeMapper == null ) return false ;
+    return _typeMappers.remove(typeMapper) ;
+  }
+
+  ////
+
+  final List<TypeAction> _typeActions = [] ;
+
+  bool addTypeAction(TypeAction typeAction) {
+    if (typeAction == null || _typeActions.contains(typeAction)) return false ;
+    _typeActions.add(typeAction) ;
+    return true ;
+  }
+
+  void addAllTypeAction( List<TypeAction> typeActions ) {
+    typeActions.forEach(  addTypeAction ) ;
+  }
+
+  bool removeTypeAction(TypeAction typeAction) {
+    if (typeAction == null ) return false ;
+    return _typeActions.remove(typeAction) ;
+  }
+
+  ////
+
   TypeRender setTypeRenderCSS(Type type, CssStyleDeclaration css) {
     var typeRender = getTypeRender(type) ;
     if (typeRender == null) return null ;
@@ -244,7 +410,6 @@ class JSONRender {
     typeRender.css = css ;
     return typeRender ;
   }
-
 
   CssStyleDeclaration _defaultCss ;
 
@@ -323,7 +488,7 @@ void _copyElementToClipboard(Element elem) {
 
 typedef SizeProvider = int Function() ;
 
-DivElement _createClosableContent( JSONRender render, DivElement output , String textOpener , String textCloser , SizeProvider sizeProvider, CssStyleDeclaration css ) {
+DivElement _createClosableContent( JSONRender render, DivElement output , String textOpener , String textCloser , bool simpleContent, SizeProvider sizeProvider, CssStyleDeclaration css ) {
   output.style.textAlign = 'left';
 
   var container = createDivInlineBlock() ;
@@ -334,6 +499,7 @@ DivElement _createClosableContent( JSONRender render, DivElement output , String
 
   contentClipboard.style.width = '0px' ;
   contentClipboard.style.height = '0px' ;
+  contentClipboard.style.lineHeight = '0px' ;
 
   if (css != null) {
     mainContent.style.cssText = css.cssText;
@@ -362,10 +528,14 @@ DivElement _createClosableContent( JSONRender render, DivElement output , String
       elemArrow.innerHtml = '$arrowRight ' ;
       contentWhenHidden.style.display = null ;
       mainContent.style.display = 'none' ;
-
     }
 
-    contentClipboard.innerHtml = '<pre>${render.buildJSONAsString()}</pre>' ;
+    var jsonStr = render.buildJSONAsString();
+
+    print('-------------------------------------------------');
+    print(jsonStr);
+
+    contentClipboard.innerHtml = '<pre>${jsonStr}</pre>' ;
     _copyElementToClipboard(contentClipboard) ;
     contentClipboard.text = '';
 
@@ -378,11 +548,10 @@ DivElement _createClosableContent( JSONRender render, DivElement output , String
   container.children.add(contentWhenHidden) ;
   container.children.add(contentClipboard) ;
 
-  var elemOpen = SpanElement()..innerHtml = ' $textOpener<br>' ;
-  var elemClose = SpanElement()..innerHtml = '<br>$textCloser<br>' ;
+  var elemOpen = SpanElement()..innerHtml = simpleContent ? ' $textOpener' : ' $textOpener<br>' ;
+  var elemClose = SpanElement()..innerHtml = simpleContent ? '&nbsp; $textCloser' : '<br>$textCloser<br>' ;
 
   mainContent.children.add(elemOpen) ;
-
   mainContent.children.add(subContent) ;
   mainContent.children.add(elemClose) ;
 
@@ -400,6 +569,10 @@ class NodeKey {
   NodeKey( [ List<String> path ] ) : path = List.from(path ?? [''] , growable: false) ;
 
   NodeKey append(String appendKey) => NodeKey( [ ...path , appendKey ] ) ;
+
+  bool matches(RegExp regExp) {
+    return regExp.hasMatch(fullKey) ;
+  }
 
   String get fullKey => toString() ;
 
@@ -427,47 +600,23 @@ class NodeKey {
 
 abstract class TypeRender {
 
-  CssStyleDeclaration _css ;
-
-  TypeRender( [CssStyleDeclaration css] ) {
-    this.css = css ;
+  TypeRender() {
+    css = null ;
   }
 
+  CssStyleDeclaration _css ;
   CssStyleDeclaration get css => _css ;
 
   set css(CssStyleDeclaration css) {
-    if ( css == null && _css == null ) {
-      _css = defaultCSS() ?? CssStyleDeclaration() ;
-    }
-    else if ( css == null ) {
-      _css ??= defaultCSS() ?? CssStyleDeclaration();
-    }
-    else {
-      _css.cssText = _css.cssText +' ; '+ css.cssText ;
-    }
+    _css = defineCSS(_css, css, defaultCSS) ;
   }
-
-  bool get hasCSS => css != null && css.cssText.trim().isNotEmpty ;
 
   bool matches(dynamic node) ;
 
-  _ValueProvider render( JSONRender render, DivElement output , dynamic node, NodeKey nodeKey) ;
+  ValueProvider render( JSONRender render, DivElement output , dynamic node, dynamic nodeOriginal, NodeKey nodeKey) ;
 
   CssStyleDeclaration defaultCSS() {
     return null ;
-  }
-
-  void applyCSS(DivElement output, [List<Element> extraElements]) {
-    if (!hasCSS) return ;
-    var newCss = output.style.cssText +' ; '+ css.cssText;
-    output.style.cssText = newCss ;
-
-    if (extraElements != null) {
-      for (var elem in extraElements) {
-        var newCss = elem.style.cssText +' ; '+ css.cssText;
-        elem.style.cssText = newCss ;
-      }
-    }
   }
 
 }
@@ -475,39 +624,141 @@ abstract class TypeRender {
 
 ////////////////////////////////////////////////////////////////////////////////
 
+
+class _NodeMapping {
+
+  final TypeMapper typeMapper ;
+  final dynamic nodeOriginal ;
+  final dynamic nodeMapped ;
+  final dynamic nodeParent ;
+  final NodeKey nodeKey ;
+
+  _NodeMapping(this.typeMapper, this.nodeOriginal, this.nodeMapped, this.nodeParent, this.nodeKey);
+
+  dynamic unmap(dynamic node, dynamic nodeParent) {
+    if (typeMapper != null) {
+      return typeMapper.unmap(node, nodeOriginal, nodeParent, nodeKey) ;
+    }
+    else {
+      return node ;
+    }
+  }
+
+  ValueProvider unmapValueProvider(ValueProvider valueProvider) {
+    return (parent) => unmap( valueProvider(parent) , parent ) ;
+  }
+
+}
+
+
+typedef NodeMatcher = bool Function(dynamic node, dynamic parent, NodeKey nodeKey) ;
+typedef NodeMap = dynamic Function(dynamic node, dynamic parent, NodeKey nodeKey) ;
+typedef NodeUnmap = dynamic Function(dynamic node, dynamic nodeOriginal, dynamic parent, NodeKey nodeKey) ;
+
+class TypeMapper {
+
+  final NodeMatcher matcher ;
+  final NodeMap mapper ;
+  final NodeUnmap unmapper ;
+
+  TypeMapper(this.matcher, this.mapper, [this.unmapper]);
+
+  bool matches(dynamic node, dynamic parent, NodeKey nodeKey) => matcher(node, parent, nodeKey) ;
+
+  dynamic map(dynamic node, dynamic parent, NodeKey nodeKey) => mapper(node, parent, nodeKey) ;
+
+  dynamic unmap(dynamic node, dynamic nodeOriginal, dynamic parent, NodeKey nodeKey) {
+    if (unmapper != null) {
+      return unmapper(node, nodeOriginal, parent, nodeKey);
+    }
+    else {
+      return node ;
+    }
+  }
+
+}
+
+typedef NodeValidator = bool Function(dynamic node, dynamic parent, NodeKey nodeKey) ;
+
+typedef NodeAction = void Function(dynamic node, dynamic parent, NodeKey nodeKey) ;
+
+class TypeAction {
+
+  final NodeMatcher matcher ;
+  final NodeAction action ;
+
+  TypeAction(this.matcher, this.action) {
+    if ( matcher == null ) throw ArgumentError.notNull('matcher') ;
+    if ( action == null ) throw ArgumentError.notNull('action') ;
+  }
+
+  bool matches(dynamic node, dynamic parent, NodeKey nodeKey) => matcher(node, parent, nodeKey) ;
+
+  void doAction(dynamic node, dynamic parent, NodeKey nodeKey) {
+    try {
+      action(node, parent, nodeKey) ;
+    }
+    catch (e,s) {
+      print(e);
+      print(s);
+    }
+  }
+
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 class TypeListRender extends TypeRender {
+
   @override
   bool matches(node) {
     return node is List ;
   }
 
   @override
-  _ValueProvider render( JSONRender render, DivElement output, node, NodeKey nodeKey) {
+  ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
     var list = (node as List) ?? [] ;
 
-    var listContent = _createClosableContent( render, output , '[' , ']' , () => list.length, css) ;
+    var simpleList = isSimpleList(list, 8, 10) ;
+
+    var listContent = _createClosableContent( render, output , '[' , ']' , simpleList, () => list.length, css) ;
 
     var valueSet = _JSONValueSet(true) ;
 
     for (var i = 0; i < list.length; ++i) {
       var elem = list[i];
 
-      var elemIdx = SpanElement()..innerHtml = ' &nbsp; &nbsp; #$i: &nbsp; ' ;
+      var elemIdx = SpanElement()..innerHtml = simpleList ? ' &nbsp; #$i: &nbsp; ' : ' &nbsp; &nbsp; #$i: &nbsp; ' ;
       var elemContent = createDivInlineBlock();
+
+      var elemNodeKey = nodeKey.append('$i');
+      var elemValueProvider = render._render(elemContent, elem, node, elemNodeKey) ;
+
+      valueSet.put(elemNodeKey, elemValueProvider) ;
+
+      if (elemValueProvider == null) continue ;
 
       listContent.children.add(elemIdx) ;
       listContent.children.add(elemContent) ;
-      listContent.children.add( BRElement() ) ;
 
-      var elemNodeKey = nodeKey.append('$i');
-      var elemValueProvider = render._render(elemContent, elem, elemNodeKey) ;
-
-      valueSet.put(elemNodeKey, elemValueProvider) ;
+      if (!simpleList) {
+        listContent.children.add(BRElement());
+      }
     }
 
-    applyCSS(output) ;
+    applyCSS(css, output) ;
 
     return valueSet.asValueProvider() ;
+  }
+
+  bool isSimpleList(List list, int elementsLimit, int stringLimit) {
+    if ( list.length <= elementsLimit ) {
+      if ( list.where( (e) => (e is num) || (e is bool) || (e is String && e.length <= stringLimit) ).length == list.length ) {
+        var listStr = '$list' ;
+        return listStr.length < elementsLimit * stringLimit ;
+      }
+    }
+    return false ;
   }
 
   @override
@@ -524,40 +775,57 @@ class TypeListRender extends TypeRender {
 
 
 class TypeObjectRender extends TypeRender {
+
   @override
   bool matches(node) {
     return node is Map ;
   }
 
   @override
-  _ValueProvider render( JSONRender render, DivElement output, node, NodeKey nodeKey) {
-    var map = (node as Map) ?? {} ;
+  ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
+    var obj = (node as Map) ?? {} ;
 
-    var objContent = _createClosableContent( render, output, '{', '}', () => map.length, css) ;
+    var simpleObj = isSimpleObject(obj, 5, 10) ;
+
+    var objContent = _createClosableContent( render, output, '{', '}', simpleObj, () => obj.length, css) ;
 
     var valueSet = _JSONValueSet() ;
 
-    for (var entry in map.entries) {
+    for (var entry in obj.entries) {
       var key = entry.key ;
 
-      var elemKey = SpanElement()..innerHtml = ' &nbsp; &nbsp; $key: &nbsp; ' ;
+      var elemNodeKey = nodeKey.append(key);
+
       var elemContent = createDivInlineBlock();
+      var elemValueProvider = render._render(elemContent, entry.value, node, elemNodeKey) ;
+
+      valueSet.put(elemNodeKey, elemValueProvider) ;
+
+      if (elemValueProvider == null) continue ;
+
+      var elemKey = SpanElement()..innerHtml = ' &nbsp; &nbsp; $key: &nbsp; ' ;
 
       elemContent.style.verticalAlign = 'top' ;
 
       objContent.children.add(elemKey) ;
       objContent.children.add(elemContent) ;
       objContent.children.add( BRElement() ) ;
-
-      var elemNodeKey = nodeKey.append(key);
-      var elemValueProvider = render._render(elemContent, entry.value, elemNodeKey) ;
-
-      valueSet.put(elemNodeKey, elemValueProvider) ;
     }
 
-    applyCSS(output) ;
+    applyCSS(css, output) ;
 
     return valueSet.asValueProvider() ;
+  }
+
+  bool isSimpleObject(Map obj, int elementsLimit, int stringLimit) {
+    if ( obj.length <= elementsLimit ) {
+      if (
+        obj.keys.where( (e) => (e is String && e.length <= stringLimit) ).length == obj.length
+        &&
+        obj.values.where( (e) => (e is num) || (e is bool) || (e is String && e.length <= stringLimit) ).length == obj.length
+      ) return true ;
+    }
+    return false ;
   }
 
   @override
@@ -605,10 +873,10 @@ class TypeTextRender extends TypeRender {
   }
 
   @override
-  _ValueProvider render( JSONRender render, DivElement output, node, NodeKey nodeKey) {
+  ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
 
     Element elem ;
-    var valueProvider ;
+    ValueProvider valueProvider ;
 
     if (render.renderMode == JSONRenderMode.INPUT) {
       elem = InputElement()
@@ -616,16 +884,16 @@ class TypeTextRender extends TypeRender {
         ..type = 'text'
       ;
       _adjustInputWidthByValueOnKeyPress(elem) ;
-      valueProvider = () => normalizeJSONValuePrimitive( (elem as InputElement).value , true ) ;
+      valueProvider = (parent) => normalizeJSONValuePrimitive( (elem as InputElement).value , true ) ;
     }
     else {
       elem = SpanElement()..text = '"$node"' ;
-      valueProvider = () => node ;
+      valueProvider = (parent) => nodeOriginal ;
     }
 
     output.children.add(elem) ;
 
-    applyCSS(output, [elem]) ;
+    applyCSS(css, output, [elem]) ;
 
     return valueProvider ;
   }
@@ -642,16 +910,17 @@ class TypeTextRender extends TypeRender {
 }
 
 class TypeNumberRender extends TypeRender {
+
   @override
   bool matches(node) {
     return node is num ;
   }
 
   @override
-  _ValueProvider render( JSONRender render, DivElement output, node, NodeKey nodeKey) {
+  ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
 
     Element elem ;
-    var valueProvider ;
+    ValueProvider valueProvider ;
 
     if (render.renderMode == JSONRenderMode.INPUT) {
       elem = InputElement()
@@ -659,16 +928,16 @@ class TypeNumberRender extends TypeRender {
         ..type = 'number'
       ;
       _adjustInputWidthByValueOnKeyPress(elem) ;
-      valueProvider = () => normalizeJSONValueNumber(  (elem as InputElement).value ) ;
+      valueProvider = (parent) => normalizeJSONValueNumber(  (elem as InputElement).value ) ;
     }
     else {
       elem = SpanElement()..text = '$node' ;
-      valueProvider = () => node ;
+      valueProvider = (parent) => nodeOriginal ;
     }
 
     output.children.add(elem) ;
 
-    applyCSS(output, [elem]) ;
+    applyCSS(css, output, [elem]) ;
 
     return valueProvider ;
   }
@@ -691,27 +960,27 @@ class TypeBoolRender extends TypeRender {
   }
 
   @override
-  _ValueProvider render( JSONRender render, DivElement output, node, NodeKey nodeKey) {
+  ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
     var val = node is bool ? node : false ;
 
     Element elem ;
-    var valueProvider ;
+    ValueProvider valueProvider ;
 
     if (render.renderMode == JSONRenderMode.INPUT) {
       elem = InputElement()
         ..checked = val
         ..type = 'checkbox'
       ;
-      valueProvider = () => (elem as InputElement).checked ;
+      valueProvider = (parent) => (elem as InputElement).checked ;
     }
     else {
       elem = SpanElement()..text = '$val' ;
-      valueProvider = () => node ;
+      valueProvider = (parent) => nodeOriginal ;
     }
 
     output.children.add(elem) ;
 
-    applyCSS(output, [elem]) ;
+    applyCSS(css, output, [elem]) ;
 
     return valueProvider ;
   }
@@ -734,12 +1003,12 @@ class TypeNullRender extends TypeRender {
   }
 
   @override
-  _ValueProvider render( JSONRender render, DivElement output, node, NodeKey nodeKey) {
+  ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
     var elem = SpanElement()..text = 'null' ;
     output.children.add(elem) ;
-    var valueProvider = () => null ;
+    var valueProvider = _VALUE_PROVIDER_NULL ;
 
-    applyCSS(output) ;
+    applyCSS(css, output) ;
 
     return valueProvider ;
   }
@@ -765,14 +1034,14 @@ class TypeURLRender extends TypeRender {
 
   @override
   bool matches(node) {
-    if (node is String) {
-      return RegExp(r'^\s*https?://').hasMatch(node) ;
+    if ( isHTTPURL(node) ) {
+      return true ;
     }
     return false ;
   }
 
   @override
-  _ValueProvider render( JSONRender render, DivElement output, node, NodeKey nodeKey) {
+  ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
     var urlLabel = '$node';
     var url = urlLabel.trim() ;
     var target ;
@@ -789,7 +1058,7 @@ class TypeURLRender extends TypeRender {
     if (target != null && target.trim().isEmpty) target = null ;
 
     Element elem ;
-    var valueProvider ;
+    ValueProvider valueProvider ;
 
     if (render.renderMode == JSONRenderMode.INPUT) {
       var input = InputElement()
@@ -812,7 +1081,7 @@ class TypeURLRender extends TypeRender {
         }
       }) ;
 
-      valueProvider = () => (elem as InputElement).value ;
+      valueProvider = (parent) => (elem as InputElement).value ;
     }
     else {
       var a = AnchorElement(href: url)
@@ -825,12 +1094,12 @@ class TypeURLRender extends TypeRender {
 
       elem = a ;
 
-      valueProvider = () => node ;
+      valueProvider = (parent) => nodeOriginal ;
     }
 
     output.children.add(elem) ;
 
-    applyCSS(output, [elem]) ;
+    applyCSS(css, output, [elem]) ;
 
     return valueProvider ;
   }
@@ -889,12 +1158,12 @@ class TypeTimeMillisRender extends TypeRender {
   }
   
   @override
-  _ValueProvider render( JSONRender render, DivElement output, node, NodeKey nodeKey) {
+  ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
     var timeMillis = parseTimeMillisInRange(node) ;
     var dateTime = DateTime.fromMillisecondsSinceEpoch(timeMillis).toLocal() ;
 
     Element elem ;
-    var valueProvider ;
+    ValueProvider valueProvider ;
 
     if (render.renderMode == JSONRenderMode.INPUT) {
       var dateTimeLocal = DATE_FORMAT_DATETIME_LOCAL.format(dateTime) ;
@@ -903,7 +1172,7 @@ class TypeTimeMillisRender extends TypeRender {
         ..value = dateTimeLocal
         ..type = 'datetime-local'
       ;
-      valueProvider = () {
+      valueProvider = (parent) {
         var time = parseToTimeMillis( (elem as InputElement).value );
 
         var timeDiff = timeMillis - time ;
@@ -931,12 +1200,12 @@ class TypeTimeMillisRender extends TypeRender {
         }
       } ) ;
 
-      valueProvider = () => node ;
+      valueProvider = (parent) => nodeOriginal ;
     }
 
     output.children.add(elem) ;
 
-    applyCSS(output, [elem]) ;
+    applyCSS(css, output, [elem]) ;
 
     return valueProvider ;
   }
@@ -953,138 +1222,51 @@ class TypeTimeMillisRender extends TypeRender {
 
 }
 
-TrackElementInViewport _TRACK_ELEMENTS_IN_VIEWPORT = TrackElementInViewport() ;
 
-abstract class TypeMediaRender extends TypeRender {
+////////////////////////////////////////////////////////////////////////////////
 
-  static bool isDataURLBase64(String s) {
-    return s != null && s.length > 5 && RegExp(r'^data:.*?;base64,').hasMatch(s) ;
-  }
-
-  Future<HttpResponse> getURL(JSONRender render, String url) {
-    return render.httpCache.getURL(url) ;
-  }
-
-  HttpResponse getURLCached(JSONRender render, String url) {
-    return render.httpCache.getCachedRequestURL( HttpMethod.GET, url ) ;
-  }
-
-  Element createImageElementFromURL(JSONRender render, bool lazyLoad, String url, [String urlType]) {
-
-    if ( isDataURLBase64(urlType) ) {
-      var div = createDivInlineBlock() ;
-      var loadingElem = SpanElement()
-        ..innerHtml = _randomPictureEntity()
-        ..style.fontSize = '120%'
-      ;
-      div.children.add( loadingElem );
-
-      var imgElem = ImageElement() ;
-
-      var cachedResponse = getURLCached(render, url) ;
-
-      if (cachedResponse != null && cachedResponse.isOK) {
-        imgElem.src = '${urlType}${ cachedResponse.body }' ;
-        return imgElem ;
-      }
-
-      if (lazyLoad) {
-        _TRACK_ELEMENTS_IN_VIEWPORT.track(imgElem, onEnterViewport: (elem) {
-          _loadElementBase64(render, imgElem, url, urlType, loadingElem);
-        });
-      }
-      else {
-        _loadElementBase64(render, imgElem, url, urlType, loadingElem);
-      }
-
-      imgElem.style.maxWidth = '100%';
-      imgElem.style.maxHeight = '100%';
-
-      div.children.add(imgElem);
-
-      return div ;
-    }
-    else {
-      var imgElem = ImageElement() ;
-      imgElem.src = url ;
-      return imgElem ;
-    }
-
-  }
-
-  void _loadElementBase64(JSONRender render, ImageElement imgElem, String url, String urlType, Element loadingElement) {
-    getURL(render, url).then( (response) {
-      if ( response.isOK ) {
-        imgElem.src = '${urlType}${ response.body }' ;
-        if (loadingElement != null) loadingElement.remove() ;
-      }
-    } );
-  }
-
-}
-
-Random _RANDOM = Random() ;
-
-List<String> _PICTURE_CODES = '1F304 1F305 1F306'.split(RegExp(r'\s+'));
-
-String _randomPictureEntity() {
-  var code = _PICTURE_CODES[ _RANDOM.nextInt(_PICTURE_CODES.length) ] ;
-  var entity = '&#x$code;';
-  return entity ;
-}
-
-class TypeImageURLRender extends TypeMediaRender {
-
-  final FilterURL filterURL  ;
-  final bool lazyLoad  ;
-
-  TypeImageURLRender( { this.filterURL , bool lazyLoad } ) : lazyLoad = lazyLoad ?? true ;
+class TypeSelectRender extends TypeRender {
 
   @override
   bool matches(node) {
-    if ( node is String && RegExp(r'^https?://').hasMatch(node) ) {
-      var url = node.trim() ;
-      if ( node.contains('?') ) {
-        url = node.split('?')[0] ;
-      }
-      
-      var match = RegExp(r'(?:png|jpe?g|gif|webp)$' , caseSensitive: false).hasMatch(url);
-
-      return match ;
+    if ( node is List ) {
+      var valueMapEntriesSize = node.whereType<Map>().map( (entry) => entry.length == 2 && entry.containsKey('value') && entry.containsKey('label')  ).length ;
+      return valueMapEntriesSize == node.length ;
     }
+
     return false ;
   }
 
   @override
-  _ValueProvider render( JSONRender render, DivElement output, node, NodeKey nodeKey) {
-    var url = '$node' ;
-    String urlType ;
+  ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
+    // ignore: omit_local_variable_types
+    List<Map> options = (node as List).cast() ;
 
-    if (filterURL != null) {
-      var ret = filterURL(url) ;
-      if (ret != null) {
-        url = ret.url ;
-        urlType = ret.type ;
-      }
+    var elem = SelectElement();
+
+    for (var opt in options) {
+      var optionElement = OptionElement( value: opt['value'] , data: opt['label'] ) ;
+      elem.add(optionElement, null) ;
     }
 
-    Element elem ;
-    var valueProvider ;
+    ValueProvider valueProvider = (parent) {
+      return elem.options.map( (opt) {
+        // ignore: omit_local_variable_types
+        Map<String, dynamic> map = { 'value': opt.value , 'label': opt.label };
+        if (opt.selected) {
+          map['selected'] = true ;
+        }
+        return map;
+      } ).toList() ;
+    } ;
 
-    if ( render.renderMode == JSONRenderMode.INPUT && false ) {
-      elem = ImageElement()..src = url ;
-      valueProvider = () => node ;
-    }
-    else {
-      elem = createImageElementFromURL(render, lazyLoad, url, urlType) ;
-      elem.style.maxWidth = '40vw';
-
-      valueProvider = () => node ;
+    if (render.renderMode != JSONRenderMode.INPUT) {
+      elem.disabled = true ;
     }
 
     output.children.add(elem) ;
 
-    applyCSS(output, [elem]) ;
+    applyCSS(css, output, [elem]) ;
 
     return valueProvider ;
   }
@@ -1092,10 +1274,268 @@ class TypeImageURLRender extends TypeMediaRender {
   @override
   CssStyleDeclaration defaultCSS() {
     return CssStyleDeclaration()
+      ..color = '#a6a233'
+      ..backgroundColor = 'rgba(0,0,0, 0.05)'
       ..borderColor = 'rgba(255,255,255, 0.30)'
     ;
   }
 
 }
 
+
+////////////////////////////////////////////////////////////////////////////////
+
+
+class TypeTableRender extends TypeRender {
+
+  bool _ignoreNullColumns ;
+
+  TypeTableRender([bool ignoreNullColumns]) {
+    this.ignoreNullColumns = ignoreNullColumns ;
+
+    rowCSS1 = null ;
+    rowCSS2 = null ;
+    headerCSS = null ;
+  }
+
+  bool get ignoreNullColumns => _ignoreNullColumns;
+
+  set ignoreNullColumns(bool value) {
+    _ignoreNullColumns = value ?? false ;
+  }
+
+  final Set<String> _ignoredColumns = {} ;
+
+  List<String> get ignoredColumns => _ignoredColumns.toList() ;
+
+  List<String> clearIgnoreColumns() {
+    var list = _ignoredColumns.toList() ;
+    _ignoredColumns.clear() ;
+    return list ;
+  }
+
+  bool ignoreColumn(String column, [bool ignore]) {
+    if (column == null) return false ;
+    column = column.trim() ;
+    if (column.isEmpty) return false ;
+
+    ignore ??= true ;
+
+    if (ignore) {
+      _ignoredColumns.add(column);
+      return true ;
+    }
+    else {
+      _ignoredColumns.remove(column);
+      return false ;
+    }
+  }
+
+  bool isIgnoredColumn(String column) {
+    if (column == null || _ignoredColumns.isEmpty ) return false ;
+    return _ignoredColumns.contains(column) ;
+  }
+
+  //////////
+
+  @override
+  CssStyleDeclaration defaultCSS() {
+    return CssStyleDeclaration()
+      ..backgroundColor = 'rgba(0,0,0, 0.05)'
+      ..borderColor = 'rgba(255,255,255, 0.30)'
+    ;
+  }
+
+  //////////
+
+  CssStyleDeclaration _headerCSS ;
+  CssStyleDeclaration get headerCSS => _headerCSS ;
+
+  set headerCSS(CssStyleDeclaration css) {
+    _headerCSS = defineCSS(_headerCSS, css, defaultHeaderCSS) ;
+  }
+
+  CssStyleDeclaration defaultHeaderCSS() {
+    return CssStyleDeclaration()
+      ..backgroundColor = 'rgba(128,128,128, 0.15)'
+    ;
+  }
+
+  CssStyleDeclaration _rowCSS1 ;
+  CssStyleDeclaration get rowCSS1 => _rowCSS1 ;
+
+  set rowCSS1(CssStyleDeclaration css) {
+    _rowCSS1 = defineCSS(_rowCSS1, css, defaultRowCSS1) ;
+  }
+
+  CssStyleDeclaration defaultRowCSS1() {
+    return CssStyleDeclaration()
+      ..backgroundColor = 'rgba(128,128,128, 0.02)'
+    ;
+  }
+
+  CssStyleDeclaration _rowCSS2 ;
+  CssStyleDeclaration get rowCSS2 => _rowCSS2 ;
+
+  set rowCSS2(CssStyleDeclaration css) {
+    _rowCSS2 = defineCSS(_rowCSS2, css, defaultRowCSS2) ;
+  }
+
+  CssStyleDeclaration defaultRowCSS2() {
+    return CssStyleDeclaration()
+      ..backgroundColor = 'rgba(128,128,128, 0.10)'
+    ;
+  }
+
+  //////////
+
+  @override
+  bool matches(node) {
+    if ( node is List ) {
+      var nonMap = node.firstWhere( (e) => !(e is Map) , orElse: () => null) ;
+      return nonMap == null ;
+    }
+    return false ;
+  }
+
+  @override
+  ValueProvider render(JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
+    // ignore: omit_local_variable_types
+    List<Map> list = (node as List).cast() ?? [] ;
+
+    var valueSet = _JSONValueSet(true) ;
+
+    var columns = getCollectionColumns(list) ;
+
+    var contentClipboard = createDivInlineBlock()
+        ..style.width = '0px'
+        ..style.height = '0px'
+        ..style.display = 'none'
+    ;
+
+    var table = TableElement() ;
+
+    var tHeader = table.createTHead() ;
+
+    {
+      var headerRow = tHeader.addRow();
+
+      applyCSS(headerCSS, headerRow) ;
+
+      headerRow.onClick.listen( (e) {
+        var jsonStr = render.buildJSONAsString();
+
+        print('-------------------------------------------------');
+        print(jsonStr);
+
+        contentClipboard.style.display = null ;
+
+        contentClipboard.innerHtml = '<pre>${jsonStr}</pre>' ;
+        _copyElementToClipboard(contentClipboard) ;
+        contentClipboard.text = '';
+
+        contentClipboard.style.display = 'none' ;
+      } );
+
+      for (var columnEntry in columns.entries) {
+        var columnKey = columnEntry.key ;
+        var columnWithValue = columnEntry.value ;
+
+        if ( (ignoreNullColumns && !columnWithValue) || isIgnoredColumn(columnKey) ) continue ;
+
+        var cell = headerRow.addCell();
+        cell.text = columnKey;
+        cell.style.fontWeight = 'bold' ;
+      }
+    }
+
+    {
+      var tbody = table.createTBody();
+
+      for (var i = 0; i < list.length; ++i) {
+        var entry = list[i];
+        var entryNodeKey = nodeKey.append('$i');
+
+        var valueSetEntry = _JSONValueSet() ;
+
+        valueSet.put(entryNodeKey, valueSetEntry.asValueProvider()) ;
+
+        var row = tbody.addRow();
+
+        var rowCSS = i % 2 == 0 ? rowCSS1 : rowCSS2 ;
+
+        applyCSS(rowCSS, row) ;
+
+        for (var columnEntry in columns.entries) {
+          var columnKey = columnEntry.key ;
+          var columnWithValue = columnEntry.value ;
+
+          if ( ignoreNullColumns && !columnWithValue ) {
+            if ( entry.containsKey(columnKey) ) {
+              assert( entry[columnKey] == null , 'Not null: ${ entry[columnKey] }' ) ;
+              var elemNodeKey = entryNodeKey.append(columnKey);
+              valueSetEntry.put(elemNodeKey, _VALUE_PROVIDER_NULL);
+            }
+            continue ;
+          }
+          else if ( isIgnoredColumn(columnKey) ) {
+            if ( entry.containsKey(columnKey) ) {
+              var val = entry[columnKey] ;
+              var elemNodeKey = entryNodeKey.append(columnKey);
+              valueSetEntry.put(elemNodeKey, (parent) => val);
+            }
+            continue ;
+          }
+
+          var cell = row.addCell() ;
+
+          if ( entry.containsKey(columnKey) ) {
+            var val = entry[columnKey] ;
+
+            var elemNodeKey = entryNodeKey.append(columnKey);
+
+            var elemContent = createDivInlineBlock();
+            var elemValueProvider = render._render(elemContent, val, entry, elemNodeKey) ;
+
+            valueSetEntry.put(elemNodeKey, elemValueProvider) ;
+
+            if (elemValueProvider == null) continue ;
+
+            elemContent.style.verticalAlign = 'top' ;
+
+            cell.children.add(elemContent) ;
+          }
+
+        }
+
+      }
+    }
+
+    output.children.add(contentClipboard);
+    output.children.add(table) ;
+
+    applyCSS(css, output, [table]) ;
+
+    return valueSet.asValueProvider() ;
+  }
+
+  Map<String,bool> getCollectionColumns(List<Map> list) {
+    // ignore: omit_local_variable_types
+    Map<String,bool> columns = {} ;
+    list.forEach( (e) => extractColumns(e,columns) ) ;
+    return columns ;
+  }
+
+  void extractColumns(Map map, Map<String,bool> columns) {
+    if (map == null) return ;
+    map.entries.forEach( (entry) {
+      var key = entry.key ;
+      var val = entry.value ;
+
+      var containsValue = val != null || ( columns[key] ?? false ) ;
+      return columns[key] = containsValue ;
+    } ) ;
+  }
+
+}
 
