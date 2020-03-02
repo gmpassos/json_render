@@ -14,7 +14,6 @@ bool isDataURLBase64(String s) {
   return s != null && s.length > 5 && RegExp(r'^data:.*?;base64,').hasMatch(s) ;
 }
 
-
 abstract class TypeMediaRender extends TypeRender {
 
   Future<HttpResponse> getURL(JSONRender render, String url) {
@@ -94,7 +93,7 @@ bool isHTTPURL(node) {
 }
 
 
-MapEntry findKey(Map map, List keys) {
+MapEntry findKeyEntry(Map map, List keys) {
   if (map == null || keys == null) return null ;
   for (var k in keys) {
     if ( map.containsKey(k) ) return MapEntry(k, map[k]) ;
@@ -103,9 +102,16 @@ MapEntry findKey(Map map, List keys) {
 }
 
 dynamic findKeyValue(Map map, List keys) {
-  var entry = findKey(map, keys) ;
+  var entry = findKeyEntry(map, keys) ;
   return entry != null ? entry.value : null ;
 }
+
+dynamic findKeyName(Map map, List keys) {
+  var entry = findKeyEntry(map, keys) ;
+  return entry != null ? entry.key : null ;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 
 num _parseNum(dynamic n) {
   if (n == null) return 0 ;
@@ -113,6 +119,101 @@ num _parseNum(dynamic n) {
   var s = 'n'.trim() ;
   return num.parse(s) ;
 }
+
+Rectangle<num> _parseRectangle(dynamic value) {
+  if (value is List) return _parseRectangleFromList(value) ;
+  if (value is Map) return _parseRectangleFromMap(value) ;
+  if (value is String) return _parseRectangleFromString(value) ;
+  return null ;
+}
+
+Rectangle<num> _parseRectangleFromList(List list) {
+  if (list.length < 4) return null ;
+  list = list.map( (e) => _parseNum(e) ).whereType<num>().toList() ;
+  if (list.length < 4) return null ;
+  return Rectangle( list[0], list[1], list[2], list[3] );
+}
+
+Rectangle<num> _parseRectangleFromMap(Map map) {
+  if (map == null || map.isEmpty) return null ;
+
+  var x = _parseNum( findKeyValue(map, ['x', 'left']) );
+  var y = _parseNum( findKeyValue(map, ['y', 'top']) );
+  var w = _parseNum( findKeyValue(map, ['width', 'w']) );
+  var h = _parseNum( findKeyValue(map, ['height', 'h']) );
+  if (x == null || y == null || w ==  null || h == null) return null ;
+  return Rectangle(x, y, w, h) ;
+}
+
+Rectangle<num> _parseRectangleFromString(String s) {
+  if (s == null) return null ;
+  s = s.trim() ;
+  if (s.isEmpty) return null ;
+
+  var parts = s.split(RegExp(r'\s*,\s*')) ;
+  if ( parts.length < 4 ) return null ;
+
+  var nums = parts.map( (e) => _parseNum(e) ).whereType<num>().toList() ;
+  if ( nums.length < 4 ) return null ;
+
+  return Rectangle<num>(nums[0], nums[1], nums[2], nums[3]);
+}
+
+////
+
+Point<num> _parsePoint(dynamic value) {
+  if (value is List) return _parsePointFromList(value) ;
+  if (value is Map) return _parsePointFromMap(value) ;
+  if (value is String) return _parsePointFromString(value) ;
+  return null ;
+}
+
+Point<num> _parsePointFromList(List l) {
+  if (l == null || l.length < 2) return null ;
+  return Point<num>( _parseNum(l[0]), _parseNum(l[1]) ) ;
+}
+
+Point<num> _parsePointFromMap(Map map) {
+  var x = _parseNum( findKeyValue(map, ['x','left']) );
+  var y = _parseNum( findKeyValue(map, ['y','top']) );
+  if (x == null || y == null ) return null ;
+  return Point<num>(x, y) ;
+}
+
+Point<num> _parsePointFromString(String s) {
+  if (s == null) return null ;
+  s = s.trim() ;
+  if (s.isEmpty) return null ;
+
+  var parts = s.split(RegExp(r'\s*,\s*'));
+  if ( parts.length < 2 ) return null ;
+  var nums = parts.map( (e) => _parseNum(e) ).whereType<num>().toList() ;
+  if ( nums.length < 2 ) return null ;
+  return Point<num>( nums[0] , nums[1] ) ;
+}
+
+////
+
+List<num> _parseNumsFromList(List list) {
+  return list.map((e) {
+    if (e is Point) {
+      return [ e.x, e.y ] ;
+    }
+    else if (e is String) {
+      var parts = e.trim().split(RegExp(r'\s*,\s*'));
+      var nums = parts.map( (e) => _parseNum(e) ).toList() ;
+      return nums.whereType<num>().toList() ;
+    }
+    else if ( e is num ) {
+      return [e] ;
+    }
+    else {
+      return [null] ;
+    }
+  }).expand( (e) => e ).toList() ;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 
 class TypeImageURLRender extends TypeMediaRender {
 
@@ -205,198 +306,6 @@ class TypeImageViewerRender extends TypeMediaRender {
     return null ;
   }
 
-  ViewerValue<Rectangle<num>> parseClip(node) {
-    if (node is Map) {
-      var clipEntry = findKey(node, ['clip', 'clipArea', 'cliparea']) ;
-
-      if (clipEntry != null) {
-        var clip = clipEntry.value ;
-
-        if (clip == null) {
-          return CanvasImageViewer.clipViewerValue(null)
-            ..key = clipEntry.key
-          ;
-        }
-        else if (clip is Map) {
-          var x = findKeyValue(clip, ['x', 'left']) ;
-          var y = findKeyValue(clip, ['y', 'top']) ;
-          var w = findKeyValue(clip, ['width', 'w']) ;
-          var h = findKeyValue(clip, ['height', 'h']) ;
-          //return Rectangle(x, y, w, h) ;
-
-          return CanvasImageViewer.clipViewerValue( Rectangle(x, y, w, h) )
-            ..key = clipEntry.key
-          ;
-        }
-        else if (clip is List) {
-          var x = clip[0] ;
-          var y = clip[1] ;
-          var w = clip[2] ;
-          var h = clip[3] ;
-
-          return CanvasImageViewer.clipViewerValue( Rectangle(x, y, w, h) )
-            ..key = clipEntry.key
-          ;
-        }
-      }
-    }
-
-    return null ;
-  }
-
-  List<dynamic> parseClipKeys(node) {
-    if (node is Map) {
-      var clipEntry = findKey(node, ['clip','clipArea','cliparea']);
-
-      if (clipEntry != null) {
-        var clip = clipEntry.value ;
-
-        if (clip == null) {
-          return [ clipEntry.key , 0,1,2,3 ] ;
-        }
-        else if (clip is Map) {
-          var xKey = findKeyValue(clip, ['x','left']) ;
-          var yKey = findKeyValue(clip, ['y','top']) ;
-          var wKey = findKeyValue(clip, ['width','w']) ;
-          var hKey = findKeyValue(clip, ['height','h']) ;
-
-          return [ clipEntry.key , xKey, yKey, wKey, hKey ] ;
-        }
-        else if (clip is List) {
-          return [ clipEntry.key , 0,1,2,3 ] ;
-        }
-      }
-    }
-    return null ;
-  }
-
-  ViewerValue< List<Rectangle<num>> > parseRectangles(node) {
-    if (node is Map) {
-      var rectsEntry = findKey(node, ['rectangles', 'rects']) ;
-
-      if (rectsEntry != null) {
-        var rects = rectsEntry.value ;
-
-        if (rects == null) {
-          return CanvasImageViewer.rectanglesViewerValue(null)
-            ..key = rectsEntry.key
-          ;
-        }
-        else if (rects is List) {
-          var list = rects.map((e) {
-            if (e is List) {
-              return Rectangle<num>(
-                  _parseNum(e[0]), _parseNum(e[1]), _parseNum(e[2]),
-                  _parseNum(e[3]));
-            }
-            else if (e is Map) {
-              var x = findKeyValue(e, ['x', 'left']);
-              var y = findKeyValue(e, ['y', 'top']);
-              var w = e['width'];
-              var h = e['height'];
-              return Rectangle<num>(
-                  _parseNum(x), _parseNum(y), _parseNum(w), _parseNum(h));
-            }
-            else if (e is String) {
-              var parts = e.trim().split(RegExp(r'\s*,\s*'));
-              return Rectangle<num>(
-                  _parseNum(parts[0]), _parseNum(parts[1]), _parseNum(parts[2]),
-                  _parseNum(parts[3]));
-            }
-            else {
-              return null;
-            }
-          }).toList();
-
-          return CanvasImageViewer.rectanglesViewerValue(list)
-            ..key = rectsEntry.key
-          ;
-        }
-      }
-    }
-
-    return null ;
-  }
-
-  ViewerValue< List<Point<num>> > parsePoints(node) {
-    if (node is Map) {
-      var pointsEntry = findKey(node, ['points']) ;
-
-      if (pointsEntry != null) {
-        var points = pointsEntry.value ;
-
-        if (points == null) {
-          return CanvasImageViewer.pointsViewerValue( null )
-            ..key = pointsEntry.key
-          ;
-        }
-        else if (points is List) {
-          var list = points.map( (e) {
-            if (e is List) {
-              return Point<num>( _parseNum(e[0]), _parseNum(e[1]) ) ;
-            }
-            else if (e is Map) {
-              var x = findKeyValue(e, ['x','left']) ;
-              var y = findKeyValue(e, ['y','top']) ;
-              return Point<num>( _parseNum(x), _parseNum(y) ) ;
-            }
-            else if (e is String) {
-              var parts = e.trim().split(RegExp(r'\s*,\s*'));
-              return Point<num>( _parseNum(parts[0]), _parseNum(parts[1]) ) ;
-            }
-            else {
-              return null ;
-            }
-          } ).toList();
-
-          return CanvasImageViewer.pointsViewerValue( list )
-            ..key = pointsEntry.key
-          ;
-        }
-
-      }
-
-    }
-    return null ;
-  }
-
-  ViewerValue< List<Point<num>> > parsePerspectiveFilter(node) {
-    if (node is Map) {
-      var pointsEntry = findKey(node, ['perspectiveFilter', 'perspectivefilter', 'perspective']) ;
-
-      if (pointsEntry != null) {
-        var points = pointsEntry.value ;
-
-        if (points == null) {
-          return CanvasImageViewer.perspectiveViewerValue( null )
-            ..key = pointsEntry.key
-          ;
-        }
-        else if (points is List) {
-          var list = points.map( (e) {
-            if (e is List) {
-              return [ _parseNum(e[0]), _parseNum(e[1]), _parseNum(e[2]), _parseNum(e[3]), _parseNum(e[4]), _parseNum(e[5]), _parseNum(e[6]), _parseNum(e[7]) ] ;
-            }
-            else if (e is String) {
-              var parts = e.trim().split(RegExp(r'\s*,\s*'));
-              return [ _parseNum(parts[0]), _parseNum(parts[1]), _parseNum(parts[2]), _parseNum(parts[3]), _parseNum(parts[4]), _parseNum(parts[5]), _parseNum(parts[6]), _parseNum(parts[7]) ] ;
-            }
-            else {
-              return null ;
-            }
-          } ).first ;
-
-          return CanvasImageViewer.perspectiveViewerValueFromNums( list )
-            ..key = pointsEntry.key
-          ;
-        }
-
-      }
-
-    }
-    return null ;
-  }
-
   DateTime parseTime(node) {
     if (node is Map) {
       var time = findKeyValue(node, ['time', 'imageTime']) ;
@@ -412,7 +321,104 @@ class TypeImageViewerRender extends TypeMediaRender {
     return null ;
   }
 
-  //////////
+  List<dynamic> parseClipKeys(node) {
+    if (node is Map) {
+      var clipEntry = findKeyEntry(node, ['clip','clipArea','cliparea']);
+
+      if (clipEntry != null) {
+        var clip = clipEntry.value ;
+
+        if (clip == null) {
+          return [ clipEntry.key , 0,1,2,3 ] ;
+        }
+        else if (clip is Map) {
+          var xKey = findKeyName(clip, ['x','left']) ;
+          var yKey = findKeyName(clip, ['y','top']) ;
+          var wKey = findKeyName(clip, ['width','w']) ;
+          var hKey = findKeyName(clip, ['height','h']) ;
+
+          return [ clipEntry.key , xKey, yKey, wKey, hKey ] ;
+        }
+        else if (clip is List) {
+          return [ clipEntry.key , 0,1,2,3 ] ;
+        }
+      }
+    }
+    return null ;
+  }
+
+  /////////////////////////////////////////////////////
+
+  // ignore: use_function_type_syntax_for_parameters
+  ViewerValue<T> _parseViewerValue<T>(node, List<String> keys , { ViewerValue<T> constructorNull() , ViewerValue<T> constructorValue(T value) , T mapperList(List value) , T mapperMap(Map value) } ) {
+    if (node is Map) {
+      var entry = findKeyEntry(node, keys) ;
+
+      if (entry != null) {
+        var entryValue = entry.value ;
+
+        if (entryValue == null) {
+          var viewerValue = constructorNull != null ? constructorNull() : constructorValue(null) ;
+          return viewerValue
+            ..key = entry.key
+          ;
+        }
+        else if (entryValue is List) {
+          if (mapperList == null) return null ;
+          var value = mapperList(entryValue) ;
+          return constructorValue(value)
+            ..key = entry.key
+          ;
+        }
+        else if (entryValue is Map) {
+          if (mapperMap == null) return null ;
+          var value = mapperMap(entryValue) ;
+          return constructorValue(value)
+            ..key = entry.key
+          ;
+        }
+      }
+    }
+
+    return null ;
+  }
+
+  ///////////////////////////////////
+
+  ViewerValue< Rectangle<num> > parseClip(node) {
+    return _parseViewerValue(
+        node, ['clip', 'clipArea', 'cliparea'],
+        constructorValue: CanvasImageViewer.clipViewerValue  ,
+        mapperList: _parseRectangleFromList,
+        mapperMap: _parseRectangleFromMap
+    );
+  }
+
+  ViewerValue< List<Rectangle<num>> > parseRectangles(node) {
+    return _parseViewerValue(
+        node, ['rectangles', 'rects'],
+        constructorValue: CanvasImageViewer.rectanglesViewerValue ,
+        mapperList: (list) => list.map( _parseRectangle ).toList()
+    );
+  }
+
+  ViewerValue< List<Point<num>> > parsePoints(node) {
+    return _parseViewerValue(
+        node, ['points'],
+        constructorValue: CanvasImageViewer.pointsViewerValue ,
+        mapperList: (list) => list.map( _parsePoint ).toList()
+    );
+  }
+
+  ViewerValue< List<Point<num>> > parsePerspectiveFilter(node) {
+    return _parseViewerValue(
+        node, ['perspectiveFilter', 'perspectivefilter', 'perspective'],
+        constructorValue: (value) => CanvasImageViewer.perspectiveViewerValue(value) ,
+        mapperList: (list) => numsToPoints( _parseNumsFromList(list) )
+    );
+  }
+
+  //////////////////////////////////////////////
 
   @override
   bool matches(node) {
@@ -484,15 +490,6 @@ class TypeImageViewerRender extends TypeMediaRender {
     var w = imageElement.naturalWidth;
     var h = imageElement.naturalHeight;
 
-    /*
-    var imageFilter ;
-    if (perspectiveFilter != null) {
-      imageFilter = (img, w, h) {
-        return applyPerspective(imageElement, perspectiveFilter.value, false) ;
-      };
-    }
-     */
-
     var inputMode = render.isInputRenderMode ;
 
     EditionType editionType ;
@@ -509,9 +506,10 @@ class TypeImageViewerRender extends TypeMediaRender {
     }
 
     var canvas = CanvasElement(width: w, height: h);
+    var gridSize = editionType == EditionType.PERSPECTIVE ? CanvasImageViewer.gridSizeViewerValue(0.05) : null ;
+
     var canvasImageViewer = CanvasImageViewer(canvas, image: imageElement,
-        //imageFilter: imageFilter,
-        perspective: perspectiveFilter , gridSize: (perspectiveFilter != null ? CanvasImageViewer.gridSizeViewerValue(0.05) : null ) ,
+        perspective: perspectiveFilter , gridSize: gridSize ,
         clip: clip, rectangles: rectangles, points: points, time: time, editable: editionType
     ) ;
 
@@ -527,6 +525,7 @@ class TypeImageViewerRender extends TypeMediaRender {
           var hKey = clipKeys[4] ;
 
           var clip = canvasImageViewer.clip;
+          clip = Rectangle<int>( clip.left.toInt() , clip.top.toInt() , clip.width.toInt() , clip.height.toInt() ) ;
 
           var nodeEdited = Map.from(node) ;
 
@@ -558,7 +557,7 @@ class TypeImageViewerRender extends TypeMediaRender {
 
         var nodeEdited = Map.from(node) ;
 
-        var pointsCoords = points.map( (p) => [p.x, p.y] ).expand( (p) => p ).toList();
+        var pointsCoords = points.map( (p) => [p.x, p.y] ).expand( (p) => p ).map( (n) => n.toInt() ).toList();
         nodeEdited[pointsKey] = pointsCoords ;
         return nodeEdited;
       };
@@ -570,19 +569,20 @@ class TypeImageViewerRender extends TypeMediaRender {
 
         var nodeEdited = Map.from(node) ;
 
-        var perspectiveCoords = perspective.map( (p) => [p.x, p.y] ).expand( (p) => p ).toList();
+        var perspectiveCoords = perspective.map( (p) => [p.x, p.y] ).expand( (p) => p ).map( (n) => n.toInt() ).toList() ;
         nodeEdited[perspectiveKey] = perspectiveCoords ;
         return nodeEdited;
       };
     }
-
-    canvasImageViewer.render();
 
     canvas.style.maxWidth = '70vw';
     canvas.style.maxHeight = '40vw';
 
     parent.children.clear();
     parent.children.add(canvas) ;
+    
+    canvasImageViewer.render();
+
   }
 
   @override

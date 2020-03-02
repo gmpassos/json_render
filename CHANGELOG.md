@@ -1,3 +1,7 @@
+## 1.2.1
+
+- TypeImageViewerRender: clean code and fix parsing of parameters. Ensure that always returns int values (not doubles).
+
 ## 1.2.0
 
 - TypeTableRender: a table that shows a list of objects.
