@@ -1,3 +1,10 @@
+## 1.2.2
+
+- JSONRender.addTypeRender( overwrite )
+- JSONRender.addAllKnownTypeRenders()
+- TypeGeolocation
+- mercury_client: ^1.0.9
+
 ## 1.2.1
 
 - TypeImageViewerRender: clean code and fix parsing of parameters. Ensure that always returns int values (not doubles).
