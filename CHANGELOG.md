@@ -1,3 +1,11 @@
+## 1.2.3
+
+- TypeTimeMillisRender renamed to TypeUnixEpochRender.
+- TypeTimeRender, TypePercentageRender
+- Fix TypeTableRender: now checks if entry node is valid.
+- mercury_client: ^1.1.1
+- swiss_knife: ^2.3.0
+
 ## 1.2.2
 
 - JSONRender.addTypeRender( overwrite )

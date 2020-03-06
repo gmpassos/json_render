@@ -6,6 +6,7 @@ import 'dart:math';
 import 'package:dom_tools/dom_tools.dart';
 import 'package:intl/intl.dart';
 import 'package:mercury_client/mercury_client.dart';
+import 'package:swiss_knife/swiss_knife.dart';
 
 import 'json_render_media.dart';
 
@@ -189,14 +190,6 @@ class JSONRender {
     _renderMode = value;
   }
 
-  DivElement render() {
-    var output = DivElement() ;
-    renderToDiv(output) ;
-    return output ;
-  }
-
-  ValueProvider _treeValueProvider ;
-
   dynamic buildJSON() {
     if (_treeValueProvider == null) return null;
     return _treeValueProvider(null) ;
@@ -206,14 +199,27 @@ class JSONRender {
     return convertToJSONAsString( buildJSON() , ident ) ;
   }
 
+  DivElement render() {
+    var output = DivElement() ;
+    renderToDiv(output) ;
+    return output ;
+  }
+
+  ValueProvider _treeValueProvider ;
+
   void renderToDiv( DivElement output ) {
     output.children.clear() ;
 
     var nodeKey = NodeKey() ;
 
-    var valueProvider = _render( output , _json , null, nodeKey ) ;
-
-    _treeValueProvider = valueProvider ;
+    try {
+      var valueProvider = _render(output, _json, null, nodeKey);
+      _treeValueProvider = valueProvider;
+    }
+    catch (e,s) {
+      print(e);
+      print(s);
+    }
   }
 
   ValueProvider _render( DivElement output , dynamic node , dynamic parent, NodeKey nodeKey ) {
@@ -227,14 +233,14 @@ class JSONRender {
     var nodeMapping = _mapNode( node , parent, nodeKey ) ;
 
     for (var typeRender in _extendedTypeRenders) {
-      if ( typeRender.matches( nodeMapping.nodeMapped ) ) {
+      if ( typeRender.matches( nodeMapping.nodeMapped, parent, nodeKey ) ) {
         var valueProvider = _callRender(typeRender, output, nodeMapping.nodeMapped, nodeMapping.nodeOriginal, nodeKey);
         return nodeMapping.unmapValueProvider(valueProvider) ;
       }
     }
 
     for (var typeRender in _defaultTypeRenders) {
-      if ( typeRender.matches( nodeMapping.nodeMapped ) ) {
+      if ( typeRender.matches( nodeMapping.nodeMapped , parent, nodeKey ) ) {
         var valueProvider = _callRender(typeRender, output, nodeMapping.nodeMapped, nodeMapping.nodeOriginal, nodeKey);
         return nodeMapping.unmapValueProvider(valueProvider) ;
       }
@@ -328,7 +334,7 @@ class JSONRender {
   void addAllKnownTypeRenders( ) {
 
     addTypeRender( TypeTableRender(false) ) ;
-    addTypeRender( TypeTimeMillisRender() ) ;
+    addTypeRender( TypeUnixEpochRender() ) ;
     addTypeRender( TypeSelectRender() ) ;
     addTypeRender( TypeURLRender() ) ;
     addTypeRender( TypeGeolocation() ) ;
@@ -635,7 +641,7 @@ abstract class TypeRender {
     _css = defineCSS(_css, css, defaultCSS) ;
   }
 
-  bool matches(dynamic node) ;
+  bool matches(dynamic node, dynamic nodeParent, NodeKey nodeKey) ;
 
   ValueProvider render( JSONRender render, DivElement output , dynamic node, dynamic nodeOriginal, NodeKey nodeKey) ;
 
@@ -740,7 +746,7 @@ class TypeAction {
 class TypeListRender extends TypeRender {
 
   @override
-  bool matches(node) {
+  bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
     return node is List ;
   }
 
@@ -806,7 +812,7 @@ class TypeListRender extends TypeRender {
 class TypeObjectRender extends TypeRender {
 
   @override
-  bool matches(node) {
+  bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
     return node is Map ;
   }
 
@@ -897,7 +903,7 @@ void _adjustInputWidthByValue( InputElement elem , [int maxWidth = 800] ) {
 class TypeTextRender extends TypeRender {
 
   @override
-  bool matches(node) {
+  bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
     return node is String ;
   }
 
@@ -941,7 +947,7 @@ class TypeTextRender extends TypeRender {
 class TypeNumberRender extends TypeRender {
 
   @override
-  bool matches(node) {
+  bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
     return node is num ;
   }
 
@@ -984,7 +990,7 @@ class TypeNumberRender extends TypeRender {
 
 class TypeBoolRender extends TypeRender {
   @override
-  bool matches(node) {
+  bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
     return node is bool ;
   }
 
@@ -1027,7 +1033,7 @@ class TypeBoolRender extends TypeRender {
 
 class TypeNullRender extends TypeRender {
   @override
-  bool matches(node) {
+  bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
     return node == null ;
   }
 
@@ -1062,8 +1068,8 @@ class TypeURLRender extends TypeRender {
   TypeURLRender( { this.filterURL } );
 
   @override
-  bool matches(node) {
-    if ( isHTTPURL(node) ) {
+  bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
+    if ( isHttpHURL(node) ) {
       return true ;
     }
     return false ;
@@ -1142,25 +1148,40 @@ class TypeURLRender extends TypeRender {
     ;
   }
 
-
 }
 
 
-class TypeTimeMillisRender extends TypeRender {
+class TypeUnixEpochRender extends TypeRender {
 
-  static bool isTimeMillisInRange(num val) {
-    return val > 946692000000 && val < 32503690800000 ;
+  final bool inMilliseconds ;
+  TypeUnixEpochRender( [bool inMilliseconds] ) :
+        inMilliseconds = inMilliseconds ?? true
+  ;
+
+  bool get inSeconds => !inMilliseconds ;
+
+  bool isInUnixEpochRange(num val) {
+    if (inMilliseconds) {
+      return val > 946692000000 && val < 32503690800000 ;
+    }
+    else {
+      return val > 946692000 && val < 32503690800 ;
+    }
+
   }
   
-  static int parseTimeMillisInRange(node) {
-    if (node is num ) {
-      return isTimeMillisInRange(node) ? node : null ;
+  int parseUnixEpoch(node) {
+    if (node is num) {
+      return isInUnixEpochRange(node) ? node.toInt() : null ;
     }
     else if (node is String) {
       var s = node.trim() ;
       if ( RegExp(r'^\d+$').hasMatch(s) ) {
         var n = int.parse(s) ;
-        return  isTimeMillisInRange(n) ? n : null ;
+
+        if ( isInUnixEpochRange(n) ) {
+          return inMilliseconds ? n : n*1000 ;
+        }
       }
     }
     return null ;
@@ -1169,14 +1190,18 @@ class TypeTimeMillisRender extends TypeRender {
   ///////////////////////
 
   @override
-  bool matches(node) {
-    return parseTimeMillisInRange(node) != null ;
+  bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
+    return parseUnixEpoch(node) != null ;
   }
 
   static final DATE_FORMAT_DATETIME_LOCAL = DateFormat('yyyy-MM-ddTHH:mm:ss', Intl.getCurrentLocale()) ;
   static final DATE_FORMAT_YYYY_MM_DD_HH_MM_SS = DateFormat('yyyy/MM/dd HH:mm:ss', Intl.getCurrentLocale()) ;
 
-  int parseToTimeMillis(String value) {
+  DateTime toDateTime(int unixEpoch, bool alreadyInMilliseconds) {
+    return DateTime.fromMillisecondsSinceEpoch( alreadyInMilliseconds ? unixEpoch : unixEpoch*1000 ) ;
+  }
+
+  int toUnixEpoch(String value) {
     if ( value == null ) return null ;
     value = value.trim() ;
     if ( value.isEmpty ) return null ;
@@ -1188,8 +1213,8 @@ class TypeTimeMillisRender extends TypeRender {
   
   @override
   ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
-    var timeMillis = parseTimeMillisInRange(node) ;
-    var dateTime = DateTime.fromMillisecondsSinceEpoch(timeMillis).toLocal() ;
+    var unixEpoch = parseUnixEpoch(node) ;
+    var dateTime = toDateTime(unixEpoch, true).toLocal() ;
 
     Element elem ;
     ValueProvider valueProvider ;
@@ -1202,9 +1227,9 @@ class TypeTimeMillisRender extends TypeRender {
         ..type = 'datetime-local'
       ;
       valueProvider = (parent) {
-        var time = parseToTimeMillis( (elem as InputElement).value );
+        var time = toUnixEpoch( (elem as InputElement).value );
 
-        var timeDiff = timeMillis - time ;
+        var timeDiff = unixEpoch - time ;
         if (timeDiff > 0 && timeDiff <= 1000) {
           time += timeDiff ;
         }
@@ -1225,7 +1250,7 @@ class TypeTimeMillisRender extends TypeRender {
           elem.text = dateTimeStr ;
         }
         else {
-          elem.text = '$timeMillis' ;
+          elem.text = '$unixEpoch' ;
         }
       } ) ;
 
@@ -1250,6 +1275,199 @@ class TypeTimeMillisRender extends TypeRender {
   }
 
 }
+
+class TypeTimeRender extends TypeRender {
+
+  final bool inMilliseconds ;
+
+  final List<String> _allowedKeys ;
+
+  TypeTimeRender( [bool inMilliseconds , this._allowedKeys ] ) :
+        inMilliseconds = inMilliseconds ?? true
+  ;
+
+  bool get inSeconds => !inMilliseconds ;
+
+  List<String> get allowedKeys => List.from(_allowedKeys).cast() ;
+
+  bool isTimeInRange(num val) {
+    if (inMilliseconds) {
+      return val > -86400000000 && val < 86400000000 ;
+    }
+    else {
+      return val > -86400000 && val < 86400000 ;
+    }
+  }
+
+  int parseTime(node) {
+    if (node is num) {
+      return isTimeInRange(node) ? node.toInt() : null ;
+    }
+    else if (node is String) {
+      var s = node.trim() ;
+      if ( RegExp(r'^\d+$').hasMatch(s) ) {
+        var n = int.parse(s) ;
+        if (isTimeInRange(n)) {
+          return inMilliseconds ? n : n*1000 ;
+        }
+      }
+    }
+    return null ;
+  }
+
+  ///////////////////////
+
+  @override
+  bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
+    return parseTime(node) != null && _isAllowedKey(nodeKey) ;
+  }
+
+  bool _isAllowedKey(NodeKey nodeKey) {
+    if (allowedKeys == null || allowedKeys.isEmpty) return false ;
+
+    var leafKey = nodeKey.leafKey.toLowerCase() ;
+
+    for (var k in allowedKeys) {
+      if ( k.toLowerCase() == leafKey ) return true ;
+    }
+
+    return false ;
+  }
+
+  @override
+  ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
+    var time = parseTime(node) ;
+    var timeOriginal = inMilliseconds ? time : time/1000 ;
+
+    Element elem ;
+    ValueProvider valueProvider ;
+
+    if (render.renderMode == JSONRenderMode.INPUT) {
+      elem = InputElement()
+        ..value = '$timeOriginal'
+        ..type = 'number'
+      ;
+
+      valueProvider = (parent) {
+        var time = parseInt( (elem as InputElement).value );
+        return time ;
+      } ;
+    }
+    else {
+      var dateTimeStr = formatTimeMillis(time) ;
+
+      elem = SpanElement()..text = dateTimeStr ;
+
+      elem.onClick.listen( (e) {
+        _copyElementToClipboard(elem);
+
+        var val = '${ elem.text }' ;
+        if ( RegExp(r'^\d+$').hasMatch(val) ) {
+          elem.text = dateTimeStr ;
+        }
+        else {
+          elem.text = '$timeOriginal' ;
+        }
+      } ) ;
+
+      valueProvider = (parent) => nodeOriginal ;
+    }
+
+    output.children.add(elem) ;
+
+    applyCSS(css, output, [elem]) ;
+
+    return valueProvider ;
+  }
+
+
+  @override
+  CssStyleDeclaration defaultCSS() {
+    return CssStyleDeclaration()
+      ..color = '#a63389'
+      ..backgroundColor = 'rgba(0,0,0, 0.05)'
+      ..borderColor = 'rgba(255,255,255, 0.30)'
+    ;
+  }
+
+}
+
+
+class TypePercentageRender extends TypeRender {
+
+  final int precision ;
+  final List<String> _allowedKeys ;
+
+  TypePercentageRender( [int precision , this._allowedKeys ] ) :
+        precision = precision != null && precision >= 0 ? precision : 2
+  ;
+
+  List<String> get allowedKeys => List.from(_allowedKeys).cast() ;
+
+  ///////////////////////
+
+  @override
+  bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
+    return node is num && _isAllowedKey(nodeKey) ;
+  }
+
+  bool _isAllowedKey(NodeKey nodeKey) {
+    if (allowedKeys == null || allowedKeys.isEmpty) return false ;
+
+    var leafKey = nodeKey.leafKey.toLowerCase() ;
+
+    for (var k in allowedKeys) {
+      if ( k.toLowerCase() == leafKey ) return true ;
+    }
+
+    return false ;
+  }
+
+  @override
+  ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
+    var percent = parsePercent(node) ;
+
+    Element elem ;
+    ValueProvider valueProvider ;
+
+    if (render.renderMode == JSONRenderMode.INPUT) {
+      elem = InputElement()
+        ..value = '$percent'
+        ..type = 'range'
+      ;
+
+      valueProvider = (parent) {
+        var n = parsePercent( (elem as InputElement).value );
+        return n ;
+      } ;
+    }
+    else {
+      var percentStr = formatPercent(percent, precision) ;
+
+      elem = SpanElement()..text = percentStr ;
+
+      valueProvider = (parent) => nodeOriginal ;
+    }
+
+    output.children.add(elem) ;
+
+    applyCSS(css, output, [elem]) ;
+
+    return valueProvider ;
+  }
+
+
+  @override
+  CssStyleDeclaration defaultCSS() {
+    return CssStyleDeclaration()
+      ..color = '#33a66b'
+      ..backgroundColor = 'rgba(0,0,0, 0.05)'
+      ..borderColor = 'rgba(255,255,255, 0.30)'
+    ;
+  }
+
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1379,7 +1597,7 @@ class TypeGeolocation extends TypeRender {
   TypeGeolocation( [ this.openDirections = false ]) ;
 
   @override
-  bool matches(node) {
+  bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
     return parseLatitudeLongitude(node) != null ;
   }
 
@@ -1513,7 +1731,7 @@ class TypeGeolocation extends TypeRender {
 class TypeSelectRender extends TypeRender {
 
   @override
-  bool matches(node) {
+  bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
     if ( node is List ) {
       var valueMapEntriesSize = node.whereType<Map>().map( (entry) => entry.length == 2 && entry.containsKey('value') && entry.containsKey('label')  ).length ;
       return valueMapEntriesSize == node.length ;
@@ -1675,7 +1893,7 @@ class TypeTableRender extends TypeRender {
   //////////
 
   @override
-  bool matches(node) {
+  bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
     if ( node is List ) {
       var nonMap = node.firstWhere( (e) => !(e is Map) , orElse: () => null) ;
       return nonMap == null ;
@@ -1740,6 +1958,12 @@ class TypeTableRender extends TypeRender {
       for (var i = 0; i < list.length; ++i) {
         var entry = list[i];
         var entryNodeKey = nodeKey.append('$i');
+
+        bool valid = render._validateNode(entry, node, entryNodeKey) ;
+        if (!valid) {
+          valueSet.put(entryNodeKey, null) ;
+          continue ;
+        }
 
         var valueSetEntry = _JSONValueSet() ;
 

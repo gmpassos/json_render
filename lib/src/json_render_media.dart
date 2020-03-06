@@ -5,14 +5,11 @@ import 'dart:math';
 
 import 'package:dom_tools/dom_tools.dart';
 import 'package:mercury_client/mercury_client.dart';
+import 'package:swiss_knife/swiss_knife.dart';
 
 import 'json_render_base.dart';
 
 TrackElementInViewport _TRACK_ELEMENTS_IN_VIEWPORT = TrackElementInViewport() ;
-
-bool isDataURLBase64(String s) {
-  return s != null && s.length > 5 && RegExp(r'^data:.*?;base64,').hasMatch(s) ;
-}
 
 abstract class TypeMediaRender extends TypeRender {
 
@@ -26,7 +23,7 @@ abstract class TypeMediaRender extends TypeRender {
 
   Element createImageElementFromURL(JSONRender render, bool lazyLoad, String url, [String urlType]) {
 
-    if ( isDataURLBase64(urlType) ) {
+    if ( DataURLBase64.matches(urlType) ) {
       var div = createDivInlineBlock() ;
       var loadingElem = SpanElement()
         ..innerHtml = _randomPictureEntity()
@@ -88,131 +85,6 @@ String _randomPictureEntity() {
   return entity ;
 }
 
-bool isHTTPURL(node) {
-  return node is String && RegExp(r'^https?://').hasMatch(node) ;
-}
-
-
-MapEntry findKeyEntry(Map map, List keys) {
-  if (map == null || keys == null) return null ;
-  for (var k in keys) {
-    if ( map.containsKey(k) ) return MapEntry(k, map[k]) ;
-  }
-  return null ;
-}
-
-dynamic findKeyValue(Map map, List keys) {
-  var entry = findKeyEntry(map, keys) ;
-  return entry != null ? entry.value : null ;
-}
-
-dynamic findKeyName(Map map, List keys) {
-  var entry = findKeyEntry(map, keys) ;
-  return entry != null ? entry.key : null ;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-num _parseNum(dynamic n) {
-  if (n == null) return 0 ;
-  if (n is num) return n ;
-  var s = 'n'.trim() ;
-  return num.parse(s) ;
-}
-
-Rectangle<num> _parseRectangle(dynamic value) {
-  if (value is List) return _parseRectangleFromList(value) ;
-  if (value is Map) return _parseRectangleFromMap(value) ;
-  if (value is String) return _parseRectangleFromString(value) ;
-  return null ;
-}
-
-Rectangle<num> _parseRectangleFromList(List list) {
-  if (list.length < 4) return null ;
-  list = list.map( (e) => _parseNum(e) ).whereType<num>().toList() ;
-  if (list.length < 4) return null ;
-  return Rectangle( list[0], list[1], list[2], list[3] );
-}
-
-Rectangle<num> _parseRectangleFromMap(Map map) {
-  if (map == null || map.isEmpty) return null ;
-
-  var x = _parseNum( findKeyValue(map, ['x', 'left']) );
-  var y = _parseNum( findKeyValue(map, ['y', 'top']) );
-  var w = _parseNum( findKeyValue(map, ['width', 'w']) );
-  var h = _parseNum( findKeyValue(map, ['height', 'h']) );
-  if (x == null || y == null || w ==  null || h == null) return null ;
-  return Rectangle(x, y, w, h) ;
-}
-
-Rectangle<num> _parseRectangleFromString(String s) {
-  if (s == null) return null ;
-  s = s.trim() ;
-  if (s.isEmpty) return null ;
-
-  var parts = s.split(RegExp(r'\s*,\s*')) ;
-  if ( parts.length < 4 ) return null ;
-
-  var nums = parts.map( (e) => _parseNum(e) ).whereType<num>().toList() ;
-  if ( nums.length < 4 ) return null ;
-
-  return Rectangle<num>(nums[0], nums[1], nums[2], nums[3]);
-}
-
-////
-
-Point<num> _parsePoint(dynamic value) {
-  if (value is List) return _parsePointFromList(value) ;
-  if (value is Map) return _parsePointFromMap(value) ;
-  if (value is String) return _parsePointFromString(value) ;
-  return null ;
-}
-
-Point<num> _parsePointFromList(List l) {
-  if (l == null || l.length < 2) return null ;
-  return Point<num>( _parseNum(l[0]), _parseNum(l[1]) ) ;
-}
-
-Point<num> _parsePointFromMap(Map map) {
-  var x = _parseNum( findKeyValue(map, ['x','left']) );
-  var y = _parseNum( findKeyValue(map, ['y','top']) );
-  if (x == null || y == null ) return null ;
-  return Point<num>(x, y) ;
-}
-
-Point<num> _parsePointFromString(String s) {
-  if (s == null) return null ;
-  s = s.trim() ;
-  if (s.isEmpty) return null ;
-
-  var parts = s.split(RegExp(r'\s*,\s*'));
-  if ( parts.length < 2 ) return null ;
-  var nums = parts.map( (e) => _parseNum(e) ).whereType<num>().toList() ;
-  if ( nums.length < 2 ) return null ;
-  return Point<num>( nums[0] , nums[1] ) ;
-}
-
-////
-
-List<num> _parseNumsFromList(List list) {
-  return list.map((e) {
-    if (e is Point) {
-      return [ e.x, e.y ] ;
-    }
-    else if (e is String) {
-      var parts = e.trim().split(RegExp(r'\s*,\s*'));
-      var nums = parts.map( (e) => _parseNum(e) ).toList() ;
-      return nums.whereType<num>().toList() ;
-    }
-    else if ( e is num ) {
-      return [e] ;
-    }
-    else {
-      return [null] ;
-    }
-  }).expand( (e) => e ).toList() ;
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 
 class TypeImageURLRender extends TypeMediaRender {
@@ -225,10 +97,10 @@ class TypeImageURLRender extends TypeMediaRender {
   static bool matchesNode(node) {
     if ( !(node is String) ) return false ;
 
-    if ( isDataURLBase64(node) ) {
+    if ( DataURLBase64.matches(node) ) {
       return true ;
     }
-    else if ( isHTTPURL(node) ) {
+    else if ( isHttpHURL(node) ) {
       var url = node.trim() ;
       if ( node.contains('?') ) {
         url = node.split('?')[0] ;
@@ -244,7 +116,7 @@ class TypeImageURLRender extends TypeMediaRender {
 
 
   @override
-  bool matches(node) {
+  bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
     return matchesNode(node) ;
   }
 
@@ -389,8 +261,8 @@ class TypeImageViewerRender extends TypeMediaRender {
     return _parseViewerValue(
         node, ['clip', 'clipArea', 'cliparea'],
         constructorValue: CanvasImageViewer.clipViewerValue  ,
-        mapperList: _parseRectangleFromList,
-        mapperMap: _parseRectangleFromMap
+        mapperList: parseRectangleFromList,
+        mapperMap: parseRectangleFromMap
     );
   }
 
@@ -398,7 +270,7 @@ class TypeImageViewerRender extends TypeMediaRender {
     return _parseViewerValue(
         node, ['rectangles', 'rects'],
         constructorValue: CanvasImageViewer.rectanglesViewerValue ,
-        mapperList: (list) => list.map( _parseRectangle ).toList()
+        mapperList: (list) => list.map( parseRectangle ).toList()
     );
   }
 
@@ -406,7 +278,7 @@ class TypeImageViewerRender extends TypeMediaRender {
     return _parseViewerValue(
         node, ['points'],
         constructorValue: CanvasImageViewer.pointsViewerValue ,
-        mapperList: (list) => list.map( _parsePoint ).toList()
+        mapperList: (list) => list.map( parsePoint ).toList()
     );
   }
 
@@ -414,14 +286,14 @@ class TypeImageViewerRender extends TypeMediaRender {
     return _parseViewerValue(
         node, ['perspectiveFilter', 'perspectivefilter', 'perspective'],
         constructorValue: (value) => CanvasImageViewer.perspectiveViewerValue(value) ,
-        mapperList: (list) => numsToPoints( _parseNumsFromList(list) )
+        mapperList: (list) => numsToPoints( parseNumsFromList(list) )
     );
   }
 
   //////////////////////////////////////////////
 
   @override
-  bool matches(node) {
+  bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
     if ( node is Map ) {
       var imageURL = parseImageURL(node) ;
       if (imageURL == null) return false ;
