@@ -1,3 +1,8 @@
+## 1.2.4
+
+- JSONRender.showNodeArrow
+- Change CSS to use CSSThemeSet.
+
 ## 1.2.3
 
 - TypeTimeMillisRender renamed to TypeUnixEpochRender.

@@ -13,6 +13,8 @@ TrackElementInViewport _TRACK_ELEMENTS_IN_VIEWPORT = TrackElementInViewport() ;
 
 abstract class TypeMediaRender extends TypeRender {
 
+  TypeMediaRender(String cssClass) : super(cssClass);
+
   Future<HttpResponse> getURL(JSONRender render, String url) {
     return render.httpCache.getURL(url) ;
   }
@@ -92,7 +94,10 @@ class TypeImageURLRender extends TypeMediaRender {
   final FilterURL filterURL  ;
   final bool lazyLoad  ;
 
-  TypeImageURLRender( { this.filterURL , bool lazyLoad } ) : lazyLoad = lazyLoad ?? true ;
+  TypeImageURLRender( { this.filterURL , bool lazyLoad } ) :
+        lazyLoad = lazyLoad ?? true ,
+        super('image-url-Render')
+  ;
 
   static bool matchesNode(node) {
     if ( !(node is String) ) return false ;
@@ -149,16 +154,9 @@ class TypeImageURLRender extends TypeMediaRender {
 
     output.children.add(elem) ;
 
-    applyCSS(css, output, [elem]) ;
+    this.applyCSS(render, output, extraElements: [elem]) ;
 
     return valueProvider ;
-  }
-
-  @override
-  CssStyleDeclaration defaultCSS() {
-    return CssStyleDeclaration()
-      ..borderColor = 'rgba(255,255,255, 0.30)'
-    ;
   }
 
 }
@@ -168,7 +166,10 @@ class TypeImageViewerRender extends TypeMediaRender {
   final FilterURL filterURL  ;
   final bool lazyLoad  ;
 
-  TypeImageViewerRender( { this.filterURL , bool lazyLoad } ) : lazyLoad = lazyLoad ?? true ;
+  TypeImageViewerRender( { this.filterURL , bool lazyLoad } ) :
+        lazyLoad = lazyLoad ?? true ,
+        super('image-viewer-render')
+  ;
 
   String parseImageURL(node) {
     if (node is Map) {
@@ -353,7 +354,7 @@ class TypeImageViewerRender extends TypeMediaRender {
 
     output.children.add(elem) ;
 
-    applyCSS(css, output, [elem]) ;
+    this.applyCSS(render, output, extraElements: [elem]) ;
 
     return valueProviderRef.asValueProvider() ;
   }
@@ -456,14 +457,6 @@ class TypeImageViewerRender extends TypeMediaRender {
     canvasImageViewer.render();
 
   }
-
-  @override
-  CssStyleDeclaration defaultCSS() {
-    return CssStyleDeclaration()
-      ..borderColor = 'rgba(255,255,255, 0.30)'
-    ;
-  }
-
 
 }
 

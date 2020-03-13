@@ -10,6 +10,8 @@ import 'package:swiss_knife/swiss_knife.dart';
 
 import 'json_render_media.dart';
 
+import 'json_render_css.dart';
+
 enum JSONRenderMode {
   INPUT,
   VIEW
@@ -323,7 +325,7 @@ class JSONRender {
     }
 
     _extendedTypeRenders.add(typeRender) ;
-    _setAllRendersDefaultCSS();
+
     return true ;
   }
 
@@ -337,7 +339,7 @@ class JSONRender {
     addTypeRender( TypeUnixEpochRender() ) ;
     addTypeRender( TypeSelectRender() ) ;
     addTypeRender( TypeURLRender() ) ;
-    addTypeRender( TypeGeolocation() ) ;
+    addTypeRender( TypeGeolocationRender() ) ;
     addTypeRender( TypeImageURLRender() ) ;
     addTypeRender( TypeImageViewerRender() ) ;
 
@@ -369,11 +371,24 @@ class JSONRender {
   ////
 
   bool _ignoreNullNodes = false ;
-
   bool get ignoreNullNodes => _ignoreNullNodes;
 
   set ignoreNullNodes(bool value) {
     _ignoreNullNodes = value ?? false ;
+  }
+
+  bool _showNodeArrow = true ;
+  bool get showNodeArrow => _showNodeArrow;
+
+  set showNodeArrow(bool value) {
+    _showNodeArrow = value ?? true ;
+  }
+
+  bool _showNodeOpenerAndCloser = true ;
+  bool get showNodeOpenerAndCloser => _showNodeOpenerAndCloser;
+
+  set showNodeOpenerAndCloser(bool value) {
+    _showNodeOpenerAndCloser = value ?? true ;
   }
 
   final List<NodeValidator> _nodeValidators = [] ;
@@ -431,41 +446,20 @@ class JSONRender {
     return _typeActions.remove(typeAction) ;
   }
 
-  ////
+  CSSThemeSet _cssThemeSet = JSON_RENDER_DEFAULT_THEME_SET ;
+  CSSThemeSet get cssThemeSet => _cssThemeSet ;
 
-  TypeRender setTypeRenderCSS(Type type, CssStyleDeclaration css) {
-    var typeRender = getTypeRender(type) ;
-    if (typeRender == null) return null ;
-
-    typeRender.css = css ;
-    return typeRender ;
+  set cssThemeSet(CSSThemeSet value) {
+    _cssThemeSet = value ?? JSON_RENDER_DEFAULT_THEME_SET ;
   }
 
-  CssStyleDeclaration _defaultCss ;
+  String get cssThemePrefix => _cssThemeSet.cssPrefix ;
 
-  CssStyleDeclaration get defaultCss => _defaultCss ;
-
-  set defaultCss(CssStyleDeclaration css) {
-    _defaultCss = css ?? CssStyleDeclaration() ;
-    _setAllRendersDefaultCSS();
+  void applyCSS(TypeRender typeRender, Element output, [ List<Element> extraElements ]) {
+    _cssThemeSet.ensureThemeLoaded() ;
   }
 
-  void _setAllRendersDefaultCSS() {
-    if (!hasDefaultCss) return ;
-
-    for ( var typeRender in _extendedTypeRenders ) {
-      typeRender.css.cssText = _defaultCss.cssText ;
-    }
-
-    for ( var typeRender in _defaultTypeRenders ) {
-      typeRender.css = _defaultCss ;
-    }
-
-  }
-
-  bool get hasDefaultCss => _defaultCss != null && _defaultCss.cssText.trim().isNotEmpty ;
-
-  static final HttpCache DEFAULT_HTTP_CACHE = HttpCache(1024*1024*16, 1000*60*5) ;
+  static final HttpCache DEFAULT_HTTP_CACHE = HttpCache( maxCacheMemory: 1024*1024*16, timeout: Duration(minutes: 5) ) ;
 
   HttpCache _httpCache = DEFAULT_HTTP_CACHE ;
 
@@ -518,7 +512,7 @@ void _copyElementToClipboard(Element elem) {
 
 typedef SizeProvider = int Function() ;
 
-DivElement _createClosableContent( JSONRender render, DivElement output , String textOpener , String textCloser , bool simpleContent, SizeProvider sizeProvider, CssStyleDeclaration css ) {
+DivElement _createClosableContent( JSONRender render, DivElement output , String textOpener , String textCloser , bool simpleContent, SizeProvider sizeProvider , String cssClass) {
   output.style.textAlign = 'left';
 
   var container = createDivInlineBlock() ;
@@ -531,9 +525,9 @@ DivElement _createClosableContent( JSONRender render, DivElement output , String
   contentClipboard.style.height = '0px' ;
   contentClipboard.style.lineHeight = '0px' ;
 
-  if (css != null) {
-    mainContent.style.cssText = css.cssText;
-    contentWhenHidden.style.cssText = css.cssText;
+  if (cssClass != null && cssClass.isNotEmpty) {
+    mainContent.classes.add(cssClass) ;
+    contentWhenHidden.classes.add(cssClass) ;
   }
 
   container.style.verticalAlign = 'top' ;
@@ -578,16 +572,66 @@ DivElement _createClosableContent( JSONRender render, DivElement output , String
   container.children.add(contentWhenHidden) ;
   container.children.add(contentClipboard) ;
 
-  var elemOpen = SpanElement()..innerHtml = simpleContent ? ' $textOpener' : ' $textOpener<br>' ;
-  var elemClose = SpanElement()..innerHtml = simpleContent ? '&nbsp; $textCloser' : '<br>$textCloser<br>' ;
+  if ( render.showNodeOpenerAndCloser ) {
+    var elemOpen = SpanElement()
+      ..innerHtml = simpleContent ? ' $textOpener' : ' $textOpener<br>'
+      ..style.verticalAlign = 'top' ;
+    ;
 
-  mainContent.children.add(elemOpen) ;
-  mainContent.children.add(subContent) ;
-  mainContent.children.add(elemClose) ;
+    var elemClose = SpanElement()
+      ..innerHtml = simpleContent ? '&nbsp; $textCloser' : '<br>$textCloser<br>'
+    ;
+
+    mainContent.children.add(elemOpen) ;
+    mainContent.children.add(subContent) ;
+    mainContent.children.add(elemClose) ;
+  }
+  else {
+    mainContent.children.add(subContent) ;
+  }
 
   return subContent ;
 
 }
+
+
+DivElement _createContent( JSONRender render, DivElement output , String textOpener , String textCloser , bool simpleContent, SizeProvider sizeProvider , String cssClass) {
+  output.style.textAlign = 'left';
+
+  var container = createDivInlineBlock() ;
+  var mainContent = createDivInlineBlock() ;
+  var subContent = createDivInlineBlock() ;
+
+  if (cssClass != null && cssClass.isNotEmpty) {
+    mainContent.classes.add(cssClass) ;
+  }
+
+  container.style.verticalAlign = 'top' ;
+
+  output.children.add(container) ;
+  container.children.add(mainContent) ;
+
+  if ( render.showNodeOpenerAndCloser ) {
+    var elemOpen = SpanElement()
+      ..innerHtml = simpleContent ? ' $textOpener' : ' $textOpener<br>'
+      ..style.verticalAlign = 'top' ;
+    ;
+
+    var elemClose = SpanElement()
+      ..innerHtml = simpleContent ? '&nbsp; $textCloser' : '<br>$textCloser<br>'
+    ;
+
+    mainContent.children.add(elemOpen) ;
+    mainContent.children.add(subContent) ;
+    mainContent.children.add(elemClose) ;
+  }
+  else {
+    mainContent.children.add(subContent) ;
+  }
+
+  return subContent ;
+}
+
 
 ///////////////////////////////////////
 
@@ -630,23 +674,32 @@ class NodeKey {
 
 abstract class TypeRender {
 
-  TypeRender() {
-    css = null ;
-  }
+  final String cssClass ;
 
-  CssStyleDeclaration _css ;
-  CssStyleDeclaration get css => _css ;
-
-  set css(CssStyleDeclaration css) {
-    _css = defineCSS(_css, css, defaultCSS) ;
+  TypeRender(this.cssClass) {
+    if (cssClass == null || cssClass.isEmpty) throw ArgumentError('Invalid cssClass') ;
   }
 
   bool matches(dynamic node, dynamic nodeParent, NodeKey nodeKey) ;
 
   ValueProvider render( JSONRender render, DivElement output , dynamic node, dynamic nodeOriginal, NodeKey nodeKey) ;
 
-  CssStyleDeclaration defaultCSS() {
-    return null ;
+  void applyCSS(JSONRender render, Element output, { String cssClass, List<Element> extraElements } ) {
+    if (cssClass == null || cssClass.isEmpty) {
+      cssClass = this.cssClass ;
+    }
+
+    var classPrefixed = '${ render.cssThemePrefix }$cssClass' ;
+
+    output.classes.add(  classPrefixed ) ;
+
+    if (  extraElements != null ) {
+      for (var elem in extraElements) {
+        elem.classes.add( classPrefixed ) ;
+      }
+    }
+
+    render.applyCSS(this, output) ;
   }
 
   @override
@@ -745,6 +798,8 @@ class TypeAction {
 
 class TypeListRender extends TypeRender {
 
+  TypeListRender() : super('list-render');
+
   @override
   bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
     return node is List ;
@@ -756,7 +811,7 @@ class TypeListRender extends TypeRender {
 
     var simpleList = isSimpleList(list, 8, 10) ;
 
-    var listContent = _createClosableContent( render, output , '[' , ']' , simpleList, () => list.length, css) ;
+    var listContent = _createClosableContent( render, output , '[' , ']' , simpleList, () => list.length, cssClass) ;
 
     var valueSet = _JSONValueSet(true) ;
 
@@ -781,7 +836,7 @@ class TypeListRender extends TypeRender {
       }
     }
 
-    applyCSS(css, output) ;
+    this.applyCSS(render, output) ;
 
     return valueSet.asValueProvider() ;
   }
@@ -796,20 +851,12 @@ class TypeListRender extends TypeRender {
     return false ;
   }
 
-  @override
-  CssStyleDeclaration defaultCSS() {
-    return CssStyleDeclaration()
-      ..color = '#808080'
-      ..backgroundColor = 'rgba(0,0,0, 0.07)'
-      ..borderRadius = '10px'
-      ..padding = '4px'
-    ;
-  }
-
 }
 
 
 class TypeObjectRender extends TypeRender {
+
+  TypeObjectRender() : super('object-render');
 
   @override
   bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
@@ -822,10 +869,18 @@ class TypeObjectRender extends TypeRender {
 
     var simpleObj = isSimpleObject(obj, 5, 10) ;
 
-    var objContent = _createClosableContent( render, output, '{', '}', simpleObj, () => obj.length, css) ;
+    var showNodeArrow = render.showNodeArrow ;
+
+    var objContent = showNodeArrow ?
+      _createClosableContent( render, output, '{', '}', simpleObj, () => obj.length, cssClass)
+      :
+      _createContent( render, output, '{', '}', simpleObj, () => obj.length, cssClass)
+    ;
 
     var valueSet = _JSONValueSet() ;
 
+
+    var entryI = 0 ;
     for (var entry in obj.entries) {
       var key = entry.key ;
 
@@ -838,16 +893,29 @@ class TypeObjectRender extends TypeRender {
 
       if (elemValueProvider == null) continue ;
 
-      var elemKey = SpanElement()..innerHtml = ' &nbsp; &nbsp; $key: &nbsp; ' ;
+      var elemKey = SpanElement()..innerHtml = showNodeArrow ? ' &nbsp; &nbsp; $key: &nbsp; ' : '&nbsp;$key: &nbsp; ' ;
 
       elemContent.style.verticalAlign = 'top' ;
 
       objContent.children.add(elemKey) ;
       objContent.children.add(elemContent) ;
-      objContent.children.add( BRElement() ) ;
+
+      var isLastEntry = entryI == obj.length-1 ;
+
+      if (!isLastEntry) {
+        objContent.children.add(
+            HRElement()
+              ..style.border = 'none'
+              ..style.margin = '8px 0 0 0'
+              ..style.backgroundColor = 'none'
+              ..style.backgroundImage = 'none'
+        );
+      }
+
+      entryI++ ;
     }
 
-    applyCSS(css, output) ;
+    this.applyCSS(render, output) ;
 
     return valueSet.asValueProvider() ;
   }
@@ -861,17 +929,6 @@ class TypeObjectRender extends TypeRender {
       ) return true ;
     }
     return false ;
-  }
-
-  @override
-  CssStyleDeclaration defaultCSS() {
-    return CssStyleDeclaration()
-      ..color = '#808080'
-      //..backgroundColor = 'rgba(0,0,0, 0.07)'
-      ..backgroundColor = 'rgba(0,0,0, 0.07)'
-      ..borderRadius = '10px'
-      ..padding = '4px'
-    ;
   }
 
 }
@@ -902,6 +959,13 @@ void _adjustInputWidthByValue( InputElement elem , [int maxWidth = 800] ) {
 
 class TypeTextRender extends TypeRender {
 
+  bool renderQuotes ;
+
+  TypeTextRender( [ bool renderQuotes = true ] ) :
+        renderQuotes = renderQuotes ?? true ,
+        super('text-render')
+  ;
+
   @override
   bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
     return node is String ;
@@ -922,29 +986,22 @@ class TypeTextRender extends TypeRender {
       valueProvider = (parent) => normalizeJSONValuePrimitive( (elem as InputElement).value , true ) ;
     }
     else {
-      elem = SpanElement()..text = '"$node"' ;
+      elem = SpanElement()..text = renderQuotes ? '"$node"' : '$node' ;
       valueProvider = (parent) => nodeOriginal ;
     }
 
     output.children.add(elem) ;
 
-    applyCSS(css, output, [elem]) ;
+    this.applyCSS(render, output, extraElements: [elem]) ;
 
     return valueProvider ;
-  }
-
-  @override
-  CssStyleDeclaration defaultCSS() {
-    return CssStyleDeclaration()
-      ..color = '#a6a233'
-      ..backgroundColor = 'rgba(0,0,0, 0.05)'
-      ..borderColor = 'rgba(255,255,255, 0.30)'
-    ;
   }
 
 }
 
 class TypeNumberRender extends TypeRender {
+
+  TypeNumberRender() : super('number-render');
 
   @override
   bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
@@ -972,23 +1029,17 @@ class TypeNumberRender extends TypeRender {
 
     output.children.add(elem) ;
 
-    applyCSS(css, output, [elem]) ;
+    this.applyCSS(render, output, extraElements: [elem]) ;
 
     return valueProvider ;
-  }
-
-  @override
-  CssStyleDeclaration defaultCSS() {
-    return CssStyleDeclaration()
-      ..color = '#35a633'
-      ..backgroundColor = 'rgba(0,0,0, 0.05)'
-      ..borderColor = 'rgba(255,255,255, 0.30)'
-    ;
   }
 
 }
 
 class TypeBoolRender extends TypeRender {
+
+  TypeBoolRender() : super('bool-render');
+
   @override
   bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
     return node is bool ;
@@ -1015,23 +1066,17 @@ class TypeBoolRender extends TypeRender {
 
     output.children.add(elem) ;
 
-    applyCSS(css, output, [elem]) ;
+    this.applyCSS(render, output, extraElements: [elem]) ;
 
     return valueProvider ;
-  }
-
-  @override
-  CssStyleDeclaration defaultCSS() {
-    return CssStyleDeclaration()
-      ..color = '#a63333'
-      ..backgroundColor = 'rgba(0,0,0, 0.05)'
-      ..borderColor = 'rgba(255,255,255, 0.30)'
-    ;
   }
 
 }
 
 class TypeNullRender extends TypeRender {
+
+  TypeNullRender() : super('null-render');
+
   @override
   bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
     return node == null ;
@@ -1043,18 +1088,9 @@ class TypeNullRender extends TypeRender {
     output.children.add(elem) ;
     var valueProvider = _VALUE_PROVIDER_NULL ;
 
-    applyCSS(css, output) ;
+    this.applyCSS(render, output) ;
 
     return valueProvider ;
-  }
-
-  @override
-  CssStyleDeclaration defaultCSS() {
-    return CssStyleDeclaration()
-      ..color = '#808080'
-      ..backgroundColor = 'rgba(0,0,0, 0.05)'
-      ..borderColor = 'rgba(255,255,255, 0.30)'
-    ;
   }
 
 }
@@ -1065,7 +1101,7 @@ class TypeURLRender extends TypeRender {
 
   final FilterURL filterURL  ;
 
-  TypeURLRender( { this.filterURL } );
+  TypeURLRender( { this.filterURL } ) : super('url-render') ;
 
   @override
   bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
@@ -1134,18 +1170,9 @@ class TypeURLRender extends TypeRender {
 
     output.children.add(elem) ;
 
-    applyCSS(css, output, [elem]) ;
+    this.applyCSS(render, output, extraElements: [elem]) ;
 
     return valueProvider ;
-  }
-
-  @override
-  CssStyleDeclaration defaultCSS() {
-    return CssStyleDeclaration()
-      ..color = '#3385a6'
-      ..backgroundColor = 'rgba(0,0,0, 0.05)'
-      ..borderColor = 'rgba(255,255,255, 0.30)'
-    ;
   }
 
 }
@@ -1155,7 +1182,8 @@ class TypeUnixEpochRender extends TypeRender {
 
   final bool inMilliseconds ;
   TypeUnixEpochRender( [bool inMilliseconds] ) :
-        inMilliseconds = inMilliseconds ?? true
+        inMilliseconds = inMilliseconds ?? true ,
+        super('unix-epoch-render')
   ;
 
   bool get inSeconds => !inMilliseconds ;
@@ -1169,7 +1197,7 @@ class TypeUnixEpochRender extends TypeRender {
     }
 
   }
-  
+
   int parseUnixEpoch(node) {
     if (node is num) {
       return isInUnixEpochRange(node) ? node.toInt() : null ;
@@ -1210,7 +1238,7 @@ class TypeUnixEpochRender extends TypeRender {
 
     return DateTime.parse(value).millisecondsSinceEpoch ;
   }
-  
+
   @override
   ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
     var unixEpoch = parseUnixEpoch(node) ;
@@ -1259,19 +1287,9 @@ class TypeUnixEpochRender extends TypeRender {
 
     output.children.add(elem) ;
 
-    applyCSS(css, output, [elem]) ;
+    this.applyCSS(render, output, extraElements: [elem]) ;
 
     return valueProvider ;
-  }
-
-
-  @override
-  CssStyleDeclaration defaultCSS() {
-    return CssStyleDeclaration()
-      ..color = '#9733a6'
-      ..backgroundColor = 'rgba(0,0,0, 0.05)'
-      ..borderColor = 'rgba(255,255,255, 0.30)'
-    ;
   }
 
 }
@@ -1283,7 +1301,8 @@ class TypeTimeRender extends TypeRender {
   final List<String> _allowedKeys ;
 
   TypeTimeRender( [bool inMilliseconds , this._allowedKeys ] ) :
-        inMilliseconds = inMilliseconds ?? true
+        inMilliseconds = inMilliseconds ?? true ,
+        super('time-render')
   ;
 
   bool get inSeconds => !inMilliseconds ;
@@ -1375,19 +1394,9 @@ class TypeTimeRender extends TypeRender {
 
     output.children.add(elem) ;
 
-    applyCSS(css, output, [elem]) ;
+    this.applyCSS(render, output, extraElements: [elem]) ;
 
     return valueProvider ;
-  }
-
-
-  @override
-  CssStyleDeclaration defaultCSS() {
-    return CssStyleDeclaration()
-      ..color = '#a63389'
-      ..backgroundColor = 'rgba(0,0,0, 0.05)'
-      ..borderColor = 'rgba(255,255,255, 0.30)'
-    ;
   }
 
 }
@@ -1399,7 +1408,8 @@ class TypePercentageRender extends TypeRender {
   final List<String> _allowedKeys ;
 
   TypePercentageRender( [int precision , this._allowedKeys ] ) :
-        precision = precision != null && precision >= 0 ? precision : 2
+        precision = precision != null && precision >= 0 ? precision : 2 ,
+        super('percentage-render')
   ;
 
   List<String> get allowedKeys => List.from(_allowedKeys).cast() ;
@@ -1451,19 +1461,9 @@ class TypePercentageRender extends TypeRender {
 
     output.children.add(elem) ;
 
-    applyCSS(css, output, [elem]) ;
+    this.applyCSS(render, output, extraElements: [elem]) ;
 
     return valueProvider ;
-  }
-
-
-  @override
-  CssStyleDeclaration defaultCSS() {
-    return CssStyleDeclaration()
-      ..color = '#33a66b'
-      ..backgroundColor = 'rgba(0,0,0, 0.05)'
-      ..borderColor = 'rgba(255,255,255, 0.30)'
-    ;
   }
 
 }
@@ -1590,11 +1590,11 @@ class Geolocation {
 
 }
 
-class TypeGeolocation extends TypeRender {
+class TypeGeolocationRender extends TypeRender {
 
   final bool openDirections ;
 
-  TypeGeolocation( [ this.openDirections = false ]) ;
+  TypeGeolocationRender( [ this.openDirections = false ]) : super('geolocation-render') ;
 
   @override
   bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
@@ -1695,7 +1695,7 @@ class TypeGeolocation extends TypeRender {
     output.children.add( SpanElement()..innerHtml = '&#x1F4CD;' ) ;
     output.children.add( geoElem ) ;
 
-    applyCSS(css, output, [geoElem] ) ;
+    this.applyCSS(render, output, extraElements: [geoElem]) ;
 
     return valueProvider ;
   }
@@ -1713,22 +1713,14 @@ class TypeGeolocation extends TypeRender {
     }
   }
 
-
-  @override
-  CssStyleDeclaration defaultCSS() {
-    return CssStyleDeclaration()
-      ..color = '#336ba6'
-      ..backgroundColor = 'rgba(0,0,0, 0.05)'
-      ..borderColor = 'rgba(255,255,255, 0.30)'
-    ;
-  }
-
 }
 
 
 ////////////////////////////////////////////////////////////////////////////////
 
 class TypeSelectRender extends TypeRender {
+
+  TypeSelectRender() : super('select-render') ;
 
   @override
   bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
@@ -1769,18 +1761,9 @@ class TypeSelectRender extends TypeRender {
 
     output.children.add(elem) ;
 
-    applyCSS(css, output, [elem]) ;
+    this.applyCSS(render, output, extraElements: [elem]) ;
 
     return valueProvider ;
-  }
-
-  @override
-  CssStyleDeclaration defaultCSS() {
-    return CssStyleDeclaration()
-      ..color = '#a6a233'
-      ..backgroundColor = 'rgba(0,0,0, 0.05)'
-      ..borderColor = 'rgba(255,255,255, 0.30)'
-    ;
   }
 
 }
@@ -1793,12 +1776,8 @@ class TypeTableRender extends TypeRender {
 
   bool _ignoreNullColumns ;
 
-  TypeTableRender([bool ignoreNullColumns]) {
+  TypeTableRender([bool ignoreNullColumns]) : super('table-render') {
     this.ignoreNullColumns = ignoreNullColumns ;
-
-    rowCSS1 = null ;
-    rowCSS2 = null ;
-    headerCSS = null ;
   }
 
   bool get ignoreNullColumns => _ignoreNullColumns;
@@ -1842,57 +1821,6 @@ class TypeTableRender extends TypeRender {
   //////////
 
   @override
-  CssStyleDeclaration defaultCSS() {
-    return CssStyleDeclaration()
-      ..backgroundColor = 'rgba(0,0,0, 0.05)'
-      ..borderColor = 'rgba(255,255,255, 0.30)'
-    ;
-  }
-
-  //////////
-
-  CssStyleDeclaration _headerCSS ;
-  CssStyleDeclaration get headerCSS => _headerCSS ;
-
-  set headerCSS(CssStyleDeclaration css) {
-    _headerCSS = defineCSS(_headerCSS, css, defaultHeaderCSS) ;
-  }
-
-  CssStyleDeclaration defaultHeaderCSS() {
-    return CssStyleDeclaration()
-      ..backgroundColor = 'rgba(128,128,128, 0.15)'
-    ;
-  }
-
-  CssStyleDeclaration _rowCSS1 ;
-  CssStyleDeclaration get rowCSS1 => _rowCSS1 ;
-
-  set rowCSS1(CssStyleDeclaration css) {
-    _rowCSS1 = defineCSS(_rowCSS1, css, defaultRowCSS1) ;
-  }
-
-  CssStyleDeclaration defaultRowCSS1() {
-    return CssStyleDeclaration()
-      ..backgroundColor = 'rgba(128,128,128, 0.02)'
-    ;
-  }
-
-  CssStyleDeclaration _rowCSS2 ;
-  CssStyleDeclaration get rowCSS2 => _rowCSS2 ;
-
-  set rowCSS2(CssStyleDeclaration css) {
-    _rowCSS2 = defineCSS(_rowCSS2, css, defaultRowCSS2) ;
-  }
-
-  CssStyleDeclaration defaultRowCSS2() {
-    return CssStyleDeclaration()
-      ..backgroundColor = 'rgba(128,128,128, 0.10)'
-    ;
-  }
-
-  //////////
-
-  @override
   bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
     if ( node is List ) {
       var nonMap = node.firstWhere( (e) => !(e is Map) , orElse: () => null) ;
@@ -1923,7 +1851,7 @@ class TypeTableRender extends TypeRender {
     {
       var headerRow = tHeader.addRow();
 
-      applyCSS(headerCSS, headerRow) ;
+      this.applyCSS(render, headerRow) ;
 
       headerRow.onClick.listen( (e) {
         var jsonStr = render.buildJSONAsString();
@@ -1971,9 +1899,9 @@ class TypeTableRender extends TypeRender {
 
         var row = tbody.addRow();
 
-        var rowCSS = i % 2 == 0 ? rowCSS1 : rowCSS2 ;
+        var rowCSS = i % 2 == 0 ? 'table-row1-render' : 'table-row2-render' ;
 
-        applyCSS(rowCSS, row) ;
+        this.applyCSS(render, row, cssClass: rowCSS) ;
 
         for (var columnEntry in columns.entries) {
           var columnKey = columnEntry.key ;
@@ -2023,7 +1951,7 @@ class TypeTableRender extends TypeRender {
     output.children.add(contentClipboard);
     output.children.add(table) ;
 
-    applyCSS(css, output, [table]) ;
+    this.applyCSS(render, output, extraElements: [table]) ;
 
     return valueSet.asValueProvider() ;
   }
