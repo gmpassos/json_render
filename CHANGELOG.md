@@ -1,3 +1,7 @@
+## 1.2.5
+
+- swiss_knife: ^2.3.7
+
 ## 1.2.4
 
 - JSONRender.showNodeArrow
