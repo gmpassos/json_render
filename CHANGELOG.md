@@ -1,3 +1,9 @@
+## 1.2.7
+
+- mercury_client: ^1.1.4
+- dom_tools: ^1.2.7
+- swiss_knife: ^2.3.9
+
 ## 1.2.6
 
 - mercury_client: ^1.1.3
