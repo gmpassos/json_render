@@ -65,7 +65,7 @@ num normalizeJSONValueNumber(dynamic value) {
 
 typedef ValueProvider = dynamic Function(dynamic parent) ;
 
-ValueProvider _VALUE_PROVIDER_NULL = (parent) => null ;
+ValueProvider VALUE_PROVIDER_NULL = (parent) => null ;
 
 class ValueProviderReference {
 
@@ -87,17 +87,17 @@ class ValueProviderReference {
 
 }
 
-class _JSONValueSet {
+class JSONValueSet {
 
   bool listMode ;
 
-  _JSONValueSet( [this.listMode = false] );
+  JSONValueSet( [this.listMode = false] );
 
   final Map<NodeKey , ValueProvider> values = {} ;
 
   void put(NodeKey key, ValueProvider val) {
     if (key != null) {
-      values[key] = val ?? _VALUE_PROVIDER_NULL ;
+      values[key] = val ?? VALUE_PROVIDER_NULL ;
     }
   }
 
@@ -215,7 +215,7 @@ class JSONRender {
     var nodeKey = NodeKey() ;
 
     try {
-      var valueProvider = _render(output, _json, null, nodeKey);
+      var valueProvider = renderNode(output, _json, null, nodeKey);
       _treeValueProvider = valueProvider;
     }
     catch (e,s) {
@@ -224,12 +224,12 @@ class JSONRender {
     }
   }
 
-  ValueProvider _render( DivElement output , dynamic node , dynamic parent, NodeKey nodeKey ) {
+  ValueProvider renderNode( DivElement output , dynamic node , dynamic parent, NodeKey nodeKey ) {
     output.style.display = 'inline-block';
 
     _attachActions(output, node, parent, nodeKey);
 
-    bool valid = _validateNode(node, parent, nodeKey) ;
+    bool valid = validateNode(node, parent, nodeKey) ;
     if (!valid) return null ;
 
     var nodeMapping = _mapNode( node , parent, nodeKey ) ;
@@ -269,7 +269,7 @@ class JSONRender {
     return node ;
   }
 
-  dynamic _validateNode(dynamic node, dynamic parent, NodeKey nodeKey) {
+  dynamic validateNode(dynamic node, dynamic parent, NodeKey nodeKey) {
     if ( ignoreNullNodes && node == null ) return false ;
 
     if ( _nodeValidators.isEmpty ) return true ;
@@ -335,9 +335,12 @@ class JSONRender {
 
   void addAllKnownTypeRenders( ) {
 
+    addTypeRender( TypePaging() ) ;
     addTypeRender( TypeTableRender(false) ) ;
+    addTypeRender( TypeDateRender() ) ;
     addTypeRender( TypeUnixEpochRender() ) ;
     addTypeRender( TypeSelectRender() ) ;
+    addTypeRender( TypeEmailRender() ) ;
     addTypeRender( TypeURLRender() ) ;
     addTypeRender( TypeGeolocationRender() ) ;
     addTypeRender( TypeImageURLRender() ) ;
@@ -491,7 +494,7 @@ class URLFiltered {
 
 typedef FilterURL = URLFiltered Function(String URL) ;
 
-void _copyElementToClipboard(Element elem) {
+void copyElementToClipboard(Element elem) {
   var selection = window.getSelection();
   var range = document.createRange();
 
@@ -560,7 +563,7 @@ DivElement _createClosableContent( JSONRender render, DivElement output , String
     print(jsonStr);
 
     contentClipboard.innerHtml = '<pre>${jsonStr}</pre>' ;
-    _copyElementToClipboard(contentClipboard) ;
+    copyElementToClipboard(contentClipboard) ;
     contentClipboard.text = '';
 
   } );
@@ -813,7 +816,7 @@ class TypeListRender extends TypeRender {
 
     var listContent = _createClosableContent( render, output , '[' , ']' , simpleList, () => list.length, cssClass) ;
 
-    var valueSet = _JSONValueSet(true) ;
+    var valueSet = JSONValueSet(true) ;
 
     for (var i = 0; i < list.length; ++i) {
       var elem = list[i];
@@ -822,7 +825,7 @@ class TypeListRender extends TypeRender {
       var elemContent = createDivInlineBlock();
 
       var elemNodeKey = nodeKey.append('$i');
-      var elemValueProvider = render._render(elemContent, elem, node, elemNodeKey) ;
+      var elemValueProvider = render.renderNode(elemContent, elem, node, elemNodeKey) ;
 
       valueSet.put(elemNodeKey, elemValueProvider) ;
 
@@ -877,7 +880,7 @@ class TypeObjectRender extends TypeRender {
       _createContent( render, output, '{', '}', simpleObj, () => obj.length, cssClass)
     ;
 
-    var valueSet = _JSONValueSet() ;
+    var valueSet = JSONValueSet() ;
 
 
     var entryI = 0 ;
@@ -887,7 +890,7 @@ class TypeObjectRender extends TypeRender {
       var elemNodeKey = nodeKey.append(key);
 
       var elemContent = createDivInlineBlock();
-      var elemValueProvider = render._render(elemContent, entry.value, node, elemNodeKey) ;
+      var elemValueProvider = render.renderNode(elemContent, entry.value, node, elemNodeKey) ;
 
       valueSet.put(elemNodeKey, elemValueProvider) ;
 
@@ -1086,7 +1089,7 @@ class TypeNullRender extends TypeRender {
   ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
     var elem = SpanElement()..text = 'null' ;
     output.children.add(elem) ;
-    var valueProvider = _VALUE_PROVIDER_NULL ;
+    var valueProvider = VALUE_PROVIDER_NULL ;
 
     this.applyCSS(render, output) ;
 
@@ -1177,6 +1180,131 @@ class TypeURLRender extends TypeRender {
 
 }
 
+class TypeEmailRender extends TypeRender {
+
+  TypeEmailRender() : super('email-render') ;
+
+  @override
+  bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
+    if ( isEmail(node) ) {
+      return true ;
+    }
+    return false ;
+  }
+
+  @override
+  ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
+    var emailLabel = '$node';
+    var email = emailLabel.trim() ;
+
+    Element elem ;
+    ValueProvider valueProvider ;
+
+    if (render.renderMode == JSONRenderMode.INPUT) {
+      var input = InputElement()
+        ..value = emailLabel
+        ..type = 'email'
+      ;
+
+      elem = input ;
+
+      _adjustInputWidthByValueOnKeyPress(elem) ;
+
+      elem.onDoubleClick.listen( (e) {
+        var inputEmail = input.value ;
+
+        if (inputEmail == emailLabel) {
+          window.open('mailto:$email', null) ;
+        }
+        else {
+          window.open('mailto:$inputEmail', null) ;
+        }
+      }) ;
+
+      valueProvider = (parent) => (elem as InputElement).value ;
+    }
+    else {
+      var a = AnchorElement(href: 'mailto:$email')
+        ..text = emailLabel
+      ;
+
+      elem = a ;
+
+      valueProvider = (parent) => nodeOriginal ;
+    }
+
+    output.children.add(elem) ;
+
+    this.applyCSS(render, output, extraElements: [elem]) ;
+
+    return valueProvider ;
+  }
+
+}
+
+final DATE_FORMAT_DATETIME_LOCAL = DateFormat('yyyy-MM-ddTHH:mm:ss', Intl.getCurrentLocale()) ;
+final DATE_FORMAT_YYYY_MM_DD = DateFormat('yyyy/MM/dd', Intl.getCurrentLocale()) ;
+final DATE_FORMAT_YYYY_MM_DD_HH_MM_SS = DateFormat('yyyy/MM/dd HH:mm:ss', Intl.getCurrentLocale()) ;
+
+final DATE_REGEXP_YYYY_MM_DD = RegExp(r'(?:\d\d\d\d/\d\d/\d\d|\d\d\d\d-\d\d-\d\d)') ;
+final DATE_REGEXP_YYYY_MM_DD_HH_MM_SS = RegExp(r'(?:\d\d\d\d/\d\d/\d\d|\d\d\d\d-\d\d-\d\d) \d\d:\d\d:\d\d') ;
+
+class TypeDateRender extends TypeRender {
+
+  TypeDateRender() : super('date-render');
+
+  @override
+  bool matches(node, nodeParent, NodeKey nodeKey) {
+    if (node is String) {
+      if ( DATE_REGEXP_YYYY_MM_DD.hasMatch(node) ) return true ;
+      if ( DATE_REGEXP_YYYY_MM_DD_HH_MM_SS.hasMatch(node) ) return true ;
+    }
+    return false ;
+  }
+
+  @override
+  ValueProvider render(JSONRender render, DivElement output, node, nodeOriginal, NodeKey nodeKey) {
+    var s = node as String ;
+    var showHour = DATE_REGEXP_YYYY_MM_DD_HH_MM_SS.hasMatch(s) ;
+    var dateTime = DateTime.parse(s).toLocal() ;
+
+    Element elem ;
+    ValueProvider valueProvider ;
+
+    if (render.renderMode == JSONRenderMode.INPUT) {
+      var dateTimeLocal = DATE_FORMAT_DATETIME_LOCAL.format(dateTime) ;
+
+      elem = InputElement()
+        ..value = dateTimeLocal
+        ..type = 'datetime-local'
+      ;
+
+      valueProvider = (parent) {
+        var time = DateTime.parse( (elem as InputElement).value );
+        var dateTimeStr = showHour ? DATE_FORMAT_YYYY_MM_DD_HH_MM_SS.format(time) : DATE_FORMAT_YYYY_MM_DD.format(time) ;
+        return dateTimeStr ;
+      } ;
+    }
+    else {
+      var dateTimeStr = showHour ? DATE_FORMAT_YYYY_MM_DD_HH_MM_SS.format(dateTime) : DATE_FORMAT_YYYY_MM_DD.format(dateTime) ;
+
+      elem = SpanElement()..text = dateTimeStr ;
+
+      elem.onClick.listen( (e) {
+        copyElementToClipboard(elem);
+      } ) ;
+
+      valueProvider = (parent) => nodeOriginal ;
+    }
+
+    output.children.add(elem) ;
+
+    this.applyCSS(render, output, extraElements: [elem]) ;
+
+    return valueProvider ;
+  }
+
+}
 
 class TypeUnixEpochRender extends TypeRender {
 
@@ -1195,7 +1323,6 @@ class TypeUnixEpochRender extends TypeRender {
     else {
       return val > 946692000 && val < 32503690800 ;
     }
-
   }
 
   int parseUnixEpoch(node) {
@@ -1221,9 +1348,6 @@ class TypeUnixEpochRender extends TypeRender {
   bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
     return parseUnixEpoch(node) != null ;
   }
-
-  static final DATE_FORMAT_DATETIME_LOCAL = DateFormat('yyyy-MM-ddTHH:mm:ss', Intl.getCurrentLocale()) ;
-  static final DATE_FORMAT_YYYY_MM_DD_HH_MM_SS = DateFormat('yyyy/MM/dd HH:mm:ss', Intl.getCurrentLocale()) ;
 
   DateTime toDateTime(int unixEpoch, bool alreadyInMilliseconds) {
     return DateTime.fromMillisecondsSinceEpoch( alreadyInMilliseconds ? unixEpoch : unixEpoch*1000 ) ;
@@ -1271,7 +1395,7 @@ class TypeUnixEpochRender extends TypeRender {
       elem = SpanElement()..text = dateTimeStr ;
 
       elem.onClick.listen( (e) {
-        _copyElementToClipboard(elem);
+        copyElementToClipboard(elem);
 
         var val = '${ elem.text }' ;
         if ( RegExp(r'^\d+$').hasMatch(val) ) {
@@ -1378,7 +1502,7 @@ class TypeTimeRender extends TypeRender {
       elem = SpanElement()..text = dateTimeStr ;
 
       elem.onClick.listen( (e) {
-        _copyElementToClipboard(elem);
+        copyElementToClipboard(elem);
 
         var val = '${ elem.text }' ;
         if ( RegExp(r'^\d+$').hasMatch(val) ) {
@@ -1683,7 +1807,7 @@ class TypeGeolocationRender extends TypeRender {
       var elem = SpanElement()..text = geoStr ;
 
       elem.onClick.listen( (e) {
-        _copyElementToClipboard(elem);
+        copyElementToClipboard(elem);
         openGoogleMaps(geo) ;
       } ) ;
 
@@ -1771,6 +1895,150 @@ class TypeSelectRender extends TypeRender {
 
 ////////////////////////////////////////////////////////////////////////////////
 
+class TypePaging extends TypeRender {
+
+  TypePaging() : super('paging-render');
+
+  @override
+  bool matches(node, nodeParent, NodeKey nodeKey) {
+    if ( node is Map ) {
+      var paging = JSONPaging.from(node) ;
+      return paging != null ;
+    }
+    return false ;
+  }
+
+  @override
+  ValueProvider render(JSONRender render, DivElement output, node, nodeOriginal, NodeKey nodeKey) {
+    var paging = JSONPaging.from(node) ;
+
+    var needsPaging = paging.needsPaging ;
+
+    var valueSet = JSONValueSet(true) ;
+
+    var table = TableElement() ;
+
+    if (needsPaging) {
+      var tHeader = table.createTHead() ;
+      var headerRow = tHeader.addRow();
+
+      this.applyCSS(render, headerRow) ;
+
+      var cell = headerRow.addCell();
+      cell.style.fontWeight = 'bold' ;
+
+      var pagingDiv = _createPagingDiv(render, output, node , nodeOriginal, nodeKey, paging);
+      cell.children.add( pagingDiv ) ;
+    }
+
+    {
+      var tbody = table.createTBody();
+
+      var entry = paging.elements ;
+      var entryNodeKey = nodeKey.append( paging.elementsEntryKey );
+
+      bool valid = render.validateNode(entry, node, entryNodeKey) ;
+
+      if (valid) {
+        var valueSetEntry = JSONValueSet() ;
+
+        valueSet.put(entryNodeKey, valueSetEntry.asValueProvider()) ;
+
+        var row = tbody.addRow();
+
+        this.applyCSS(render, row) ;
+
+        var cell = row.addCell() ;
+
+        var elemContent = createDivInlineBlock();
+        var elemValueProvider = render.renderNode(elemContent, entry, node, entryNodeKey) ;
+
+        valueSetEntry.put(entryNodeKey, elemValueProvider) ;
+
+        if (elemValueProvider != null) {
+          elemContent.style.verticalAlign = 'top' ;
+          cell.children.add(elemContent) ;
+        }
+      }
+      else {
+        valueSet.put(entryNodeKey, null) ;
+      }
+
+    }
+
+    if (needsPaging) {
+      var tFoot = table.createTFoot() ;
+      var footRow = tFoot.addRow();
+
+      this.applyCSS(render, footRow) ;
+
+      var cell = footRow.addCell();
+      cell.style.fontWeight = 'bold' ;
+
+      var pagingDiv = _createPagingDiv(render, output, node , nodeOriginal, nodeKey, paging);
+      cell.children.add( pagingDiv ) ;
+    }
+
+    output.children.add(table) ;
+
+    this.applyCSS(render, output, extraElements: [table]) ;
+
+    return valueSet.asValueProvider() ;
+  }
+
+  DivElement _createPagingDiv(JSONRender render, DivElement output, node, nodeOriginal, NodeKey nodeKey, JSONPaging paging) {
+    var pagingDiv = createDivInline() ;
+
+    var prev = SpanElement()
+      ..style.cursor = 'pointer'
+      ..innerHtml = '&#x2190; '
+    ;
+
+    var current = SpanElement()
+      ..text = '${ paging.currentPage+1 }'
+    ;
+
+    var next = SpanElement()
+      ..style.cursor = 'pointer'
+      ..innerHtml = ' &#x2192;'
+    ;
+
+    prev.onClick.listen((e) async {
+      prev.text = '... ' ;
+      var prevPaging = await paging.requestPreviousPage() ;
+      if (prevPaging != null) {
+        output.children.clear();
+        this.render(render, output, prevPaging, nodeOriginal, nodeKey);
+      }
+    });
+
+    next.onClick.listen((e) async {
+      next.innerHtml = ' ...' ;
+      var nextPaging = await paging.requestNextPage() ;
+      if (nextPaging != null) {
+        output.children.clear();
+        this.render(render, output, nextPaging, nodeOriginal, nodeKey);
+      }
+    });
+
+    if (paging.isFirstPage) {
+      pagingDiv.children.add( current ) ;
+      pagingDiv.children.add( next ) ;
+    }
+    else if (paging.isLastPage) {
+      pagingDiv.children.add( prev ) ;
+      pagingDiv.children.add( current ) ;
+    }
+    else {
+      pagingDiv.children.add( prev ) ;
+      pagingDiv.children.add( current ) ;
+      pagingDiv.children.add( next ) ;
+    }
+
+    return pagingDiv ;
+  }
+
+}
 
 class TypeTableRender extends TypeRender {
 
@@ -1834,7 +2102,7 @@ class TypeTableRender extends TypeRender {
     // ignore: omit_local_variable_types
     List<Map> list = (node as List).cast() ?? [] ;
 
-    var valueSet = _JSONValueSet(true) ;
+    var valueSet = JSONValueSet(true) ;
 
     var columns = getCollectionColumns(list) ;
 
@@ -1844,11 +2112,14 @@ class TypeTableRender extends TypeRender {
         ..style.display = 'none'
     ;
 
+    output.style.maxWidth = '98vw' ;
+    output.style.overflow = 'auto' ;
+
     var table = TableElement() ;
 
-    var tHeader = table.createTHead() ;
-
     {
+      var tHeader = table.createTHead() ;
+
       var headerRow = tHeader.addRow();
 
       this.applyCSS(render, headerRow) ;
@@ -1862,7 +2133,7 @@ class TypeTableRender extends TypeRender {
         contentClipboard.style.display = null ;
 
         contentClipboard.innerHtml = '<pre>${jsonStr}</pre>' ;
-        _copyElementToClipboard(contentClipboard) ;
+        copyElementToClipboard(contentClipboard) ;
         contentClipboard.text = '';
 
         contentClipboard.style.display = 'none' ;
@@ -1887,13 +2158,13 @@ class TypeTableRender extends TypeRender {
         var entry = list[i];
         var entryNodeKey = nodeKey.append('$i');
 
-        bool valid = render._validateNode(entry, node, entryNodeKey) ;
+        bool valid = render.validateNode(entry, node, entryNodeKey) ;
         if (!valid) {
           valueSet.put(entryNodeKey, null) ;
           continue ;
         }
 
-        var valueSetEntry = _JSONValueSet() ;
+        var valueSetEntry = JSONValueSet() ;
 
         valueSet.put(entryNodeKey, valueSetEntry.asValueProvider()) ;
 
@@ -1911,7 +2182,7 @@ class TypeTableRender extends TypeRender {
             if ( entry.containsKey(columnKey) ) {
               assert( entry[columnKey] == null , 'Not null: ${ entry[columnKey] }' ) ;
               var elemNodeKey = entryNodeKey.append(columnKey);
-              valueSetEntry.put(elemNodeKey, _VALUE_PROVIDER_NULL);
+              valueSetEntry.put(elemNodeKey, VALUE_PROVIDER_NULL);
             }
             continue ;
           }
@@ -1932,7 +2203,7 @@ class TypeTableRender extends TypeRender {
             var elemNodeKey = entryNodeKey.append(columnKey);
 
             var elemContent = createDivInlineBlock();
-            var elemValueProvider = render._render(elemContent, val, entry, elemNodeKey) ;
+            var elemValueProvider = render.renderNode(elemContent, val, entry, elemNodeKey) ;
 
             valueSetEntry.put(elemNodeKey, elemValueProvider) ;
 

@@ -1,3 +1,14 @@
+## 1.2.8
+
+- TypeEmailRender
+- TypeDateRender
+- TypePaging: show sub elements with paging handling.
+- TypeChartsRender: render data as charts.
+- mercury_client: ^1.1.5
+- dom_tools: ^1.2.8
+- swiss_knife: ^2.3.10
+- chartjs: ^0.5.1
+
 ## 1.2.7
 
 - mercury_client: ^1.1.4
