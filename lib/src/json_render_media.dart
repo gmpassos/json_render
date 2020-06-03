@@ -1,4 +1,3 @@
-
 import 'dart:async';
 import 'dart:html';
 import 'dart:math';
@@ -9,47 +8,44 @@ import 'package:swiss_knife/swiss_knife.dart';
 
 import 'json_render_base.dart';
 
-
-TrackElementInViewport _TRACK_ELEMENTS_IN_VIEWPORT = TrackElementInViewport() ;
+TrackElementInViewport _TRACK_ELEMENTS_IN_VIEWPORT = TrackElementInViewport();
 
 /// Base class to render images and other types of media.
 abstract class TypeMediaRender extends TypeRender {
-
   TypeMediaRender(String cssClass) : super(cssClass);
 
   Future<HttpResponse> getURL(JSONRender render, String url) {
-    return render.httpCache.getURL(url) ;
+    return render.httpCache.getURL(url);
   }
 
   HttpResponse getURLCached(JSONRender render, String url) {
-    return render.httpCache.getCachedRequestURL( HttpMethod.GET, url ) ;
+    return render.httpCache.getCachedRequestURL(HttpMethod.GET, url);
   }
 
-  Element createImageElementFromURL(JSONRender render, bool lazyLoad, String url, [String urlType]) {
-
-    if ( DataURLBase64.matches(urlType) ) {
-      var div = createDivInlineBlock() ;
+  Element createImageElementFromURL(
+      JSONRender render, bool lazyLoad, String url,
+      [String urlType]) {
+    if (DataURLBase64.matches(urlType)) {
+      var div = createDivInlineBlock();
       var loadingElem = SpanElement()
         ..innerHtml = _randomPictureEntity()
-        ..style.fontSize = '120%'
-      ;
-      div.children.add( loadingElem );
+        ..style.fontSize = '120%';
+      div.children.add(loadingElem);
 
-      var imgElem = ImageElement() ;
+      var imgElem = ImageElement();
 
-      var cachedResponse = getURLCached(render, url) ;
+      var cachedResponse = getURLCached(render, url);
 
       if (cachedResponse != null && cachedResponse.isOK) {
-        imgElem.src = '${urlType}${ cachedResponse.body }' ;
-        return imgElem ;
+        imgElem.src = '${urlType}${cachedResponse.body}';
+        return imgElem;
       }
 
       if (lazyLoad) {
         _TRACK_ELEMENTS_IN_VIEWPORT.track(imgElem, onEnterViewport: (elem) {
           _loadElementBase64(render, imgElem, url, urlType, loadingElem);
         });
-      }
-      else {
+      } else {
         _loadElementBase64(render, imgElem, url, urlType, loadingElem);
       }
 
@@ -58,127 +54,123 @@ abstract class TypeMediaRender extends TypeRender {
 
       div.children.add(imgElem);
 
-      return div ;
+      return div;
+    } else {
+      var imgElem = ImageElement();
+      imgElem.src = url;
+      return imgElem;
     }
-    else {
-      var imgElem = ImageElement() ;
-      imgElem.src = url ;
-      return imgElem ;
-    }
-
   }
 
-  void _loadElementBase64(JSONRender render, ImageElement imgElem, String url, String urlType, Element loadingElement) {
-    getURL(render, url).then( (response) {
-      if ( response.isOK ) {
-        imgElem.src = '${urlType}${ response.body }' ;
-        if (loadingElement != null) loadingElement.remove() ;
+  void _loadElementBase64(JSONRender render, ImageElement imgElem, String url,
+      String urlType, Element loadingElement) {
+    getURL(render, url).then((response) {
+      if (response.isOK) {
+        imgElem.src = '${urlType}${response.body}';
+        if (loadingElement != null) loadingElement.remove();
       }
-    } );
+    });
   }
-
 }
 
-Random _RANDOM = Random() ;
+Random _RANDOM = Random();
 
 List<String> _PICTURE_CODES = '1F304 1F305 1F306'.split(RegExp(r'\s+'));
 
 String _randomPictureEntity() {
-  var code = _PICTURE_CODES[ _RANDOM.nextInt(_PICTURE_CODES.length) ] ;
+  var code = _PICTURE_CODES[_RANDOM.nextInt(_PICTURE_CODES.length)];
   var entity = '&#x$code;';
-  return entity ;
+  return entity;
 }
 
 /// Renders an image from an URL.
 class TypeImageURLRender extends TypeMediaRender {
+  final FilterURL filterURL;
 
-  final FilterURL filterURL  ;
-  final bool lazyLoad  ;
+  final bool lazyLoad;
 
-  TypeImageURLRender( { this.filterURL , bool lazyLoad } ) :
-        lazyLoad = lazyLoad ?? true ,
-        super('image-url-Render')
-  ;
+  TypeImageURLRender({this.filterURL, bool lazyLoad})
+      : lazyLoad = lazyLoad ?? true,
+        super('image-url-Render');
 
   static bool matchesNode(node) {
-    if ( !(node is String) ) return false ;
+    if (!(node is String)) return false;
 
-    if ( DataURLBase64.matches(node) ) {
-      return true ;
-    }
-    else if ( isHttpURL(node) ) {
-      var url = node.trim() ;
-      if ( node.contains('?') ) {
-        url = node.split('?')[0] ;
+    if (DataURLBase64.matches(node)) {
+      return true;
+    } else if (isHttpURL(node)) {
+      var url = node.trim();
+      if (node.contains('?')) {
+        url = node.split('?')[0];
       }
 
-      var match = RegExp(r'(?:png|jpe?g|gif|webp)$' , caseSensitive: false).hasMatch(url);
+      var match = RegExp(r'(?:png|jpe?g|gif|webp)$', caseSensitive: false)
+          .hasMatch(url);
 
-      return match ;
+      return match;
     }
 
-    return false ;
+    return false;
   }
-
 
   @override
   bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
-    return matchesNode(node) ;
+    return matchesNode(node);
   }
 
-  String imageMaxWidth = '40vw' ;
-  String imageMaxHeight ;
+  String imageMaxWidth = '40vw';
+
+  String imageMaxHeight;
 
   @override
-  ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
-    var url = '$node' ;
-    String urlType ;
+  ValueProvider render(JSONRender render, DivElement output, dynamic node,
+      dynamic nodeOriginal, NodeKey nodeKey) {
+    var url = '$node';
+    String urlType;
 
     if (filterURL != null) {
-      var ret = filterURL(url) ;
+      var ret = filterURL(url);
       if (ret != null) {
-        url = ret.url ;
-        urlType = ret.type ;
+        url = ret.url;
+        urlType = ret.type;
       }
     }
 
-    Element elem ;
-    ValueProvider valueProvider ;
+    Element elem;
+    ValueProvider valueProvider;
 
-    if ( render.renderMode == JSONRenderMode.INPUT && false ) {
-      elem = ImageElement()..src = url ;
-      valueProvider = (parent) => node ;
-    }
-    else {
-      elem = createImageElementFromURL(render, lazyLoad, url, urlType) ;
-      valueProvider = (parent) => nodeOriginal ;
-    }
-
-    if ( imageMaxWidth != null ) {
-      elem.style.maxWidth = imageMaxWidth ;
+    if (render.renderMode == JSONRenderMode.INPUT && false) {
+      elem = ImageElement()..src = url;
+      valueProvider = (parent) => node;
+    } else {
+      elem = createImageElementFromURL(render, lazyLoad, url, urlType);
+      valueProvider = (parent) => nodeOriginal;
     }
 
-    if ( imageMaxHeight != null ) {
-      elem.style.maxHeight = imageMaxHeight ;
+    if (imageMaxWidth != null) {
+      elem.style.maxWidth = imageMaxWidth;
+    }
+
+    if (imageMaxHeight != null) {
+      elem.style.maxHeight = imageMaxHeight;
     }
 
     if (elem is ImageElement) {
-      var img = elem ;
+      var img = elem;
 
-      img.style.cursor = 'pointer' ;
+      img.style.cursor = 'pointer';
 
       img.onClick.listen((e) {
-        showDialogImage( img.src ) ;
+        showDialogImage(img.src);
       });
     }
 
-    output.children.add(elem) ;
+    output.children.add(elem);
 
-    this.applyCSS(render, output, extraElements: [elem]) ;
+    this.applyCSS(render, output, extraElements: [elem]);
 
-    return valueProvider ;
+    return valueProvider;
   }
-
 }
 
 /// Renders an Image with informations from an JSON Object.
@@ -194,284 +186,301 @@ class TypeImageURLRender extends TypeMediaRender {
 ///   }
 /// ```
 class TypeImageViewerRender extends TypeMediaRender {
+  final FilterURL filterURL;
 
-  final FilterURL filterURL  ;
-  final bool lazyLoad  ;
+  final bool lazyLoad;
 
-  TypeImageViewerRender( { this.filterURL , bool lazyLoad } ) :
-        lazyLoad = lazyLoad ?? true ,
-        super('image-viewer-render')
-  ;
+  TypeImageViewerRender({this.filterURL, bool lazyLoad})
+      : lazyLoad = lazyLoad ?? true,
+        super('image-viewer-render');
 
   String parseImageURL(node) {
     if (node is Map) {
-      var url = findKeyValue(node, ['url', 'image', 'imageURL']) ;
-      return url != null ? '$url' : null ;
+      var url = findKeyValue(node, ['url', 'image', 'imageURL']);
+      return url != null ? '$url' : null;
     }
-    return null ;
+    return null;
   }
 
   DateTime parseTime(node) {
     if (node is Map) {
-      var time = findKeyValue(node, ['time', 'imageTime']) ;
+      var time = findKeyValue(node, ['time', 'imageTime']);
 
       if (time != null) {
-        if ( time is num ) return DateTime.fromMillisecondsSinceEpoch( time ) ;
-        if ( time is String ) {
-          if ( RegExp(r'^\d+$').hasMatch(time) ) return DateTime.fromMillisecondsSinceEpoch( int.parse(time) ) ;
-          return DateTime.parse(time) ;
+        if (time is num) return DateTime.fromMillisecondsSinceEpoch(time);
+        if (time is String) {
+          if (RegExp(r'^\d+$').hasMatch(time)) {
+            return DateTime.fromMillisecondsSinceEpoch(int.parse(time));
+          }
+          return DateTime.parse(time);
         }
       }
     }
-    return null ;
+    return null;
   }
 
   List<dynamic> parseClipKeys(node) {
     if (node is Map) {
-      var clipEntry = findKeyEntry(node, ['clip','clipArea','cliparea']);
+      var clipEntry = findKeyEntry(node, ['clip', 'clipArea', 'cliparea']);
 
       if (clipEntry != null) {
-        var clip = clipEntry.value ;
+        var clip = clipEntry.value;
 
         if (clip == null) {
-          return [ clipEntry.key , 0,1,2,3 ] ;
-        }
-        else if (clip is Map) {
-          var xKey = findKeyName(clip, ['x','left']) ;
-          var yKey = findKeyName(clip, ['y','top']) ;
-          var wKey = findKeyName(clip, ['width','w']) ;
-          var hKey = findKeyName(clip, ['height','h']) ;
+          return [clipEntry.key, 0, 1, 2, 3];
+        } else if (clip is Map) {
+          var xKey = findKeyName(clip, ['x', 'left']);
+          var yKey = findKeyName(clip, ['y', 'top']);
+          var wKey = findKeyName(clip, ['width', 'w']);
+          var hKey = findKeyName(clip, ['height', 'h']);
 
-          return [ clipEntry.key , xKey, yKey, wKey, hKey ] ;
-        }
-        else if (clip is List) {
-          return [ clipEntry.key , 0,1,2,3 ] ;
+          return [clipEntry.key, xKey, yKey, wKey, hKey];
+        } else if (clip is List) {
+          return [clipEntry.key, 0, 1, 2, 3];
         }
       }
     }
-    return null ;
+    return null;
   }
-
 
   // ignore: use_function_type_syntax_for_parameters
-  ViewerValue<T> _parseViewerValue<T>(node, List<String> keys , { ViewerValue<T> constructorNull() , ViewerValue<T> constructorValue(T value) , T mapperList(List value) , T mapperMap(Map value) } ) {
+  ViewerValue<T> _parseViewerValue<T>(node, List<String> keys,
+      {ViewerValue<T> Function() constructorNull,
+      ViewerValue<T> Function(T value) constructorValue,
+      T Function(List value) mapperList,
+      T Function(Map value) mapperMap}) {
     if (node is Map) {
-      var entry = findKeyEntry(node, keys) ;
+      var entry = findKeyEntry(node, keys);
 
       if (entry != null) {
-        var entryValue = entry.value ;
+        var entryValue = entry.value;
 
         if (entryValue == null) {
-          var viewerValue = constructorNull != null ? constructorNull() : constructorValue(null) ;
-          return viewerValue
-            ..key = entry.key
-          ;
-        }
-        else if (entryValue is List) {
-          if (mapperList == null) return null ;
-          var value = mapperList(entryValue) ;
-          return constructorValue(value)
-            ..key = entry.key
-          ;
-        }
-        else if (entryValue is Map) {
-          if (mapperMap == null) return null ;
-          var value = mapperMap(entryValue) ;
-          return constructorValue(value)
-            ..key = entry.key
-          ;
+          var viewerValue = constructorNull != null
+              ? constructorNull()
+              : constructorValue(null);
+          return viewerValue..key = entry.key;
+        } else if (entryValue is List) {
+          if (mapperList == null) return null;
+          var value = mapperList(entryValue);
+          return constructorValue(value)..key = entry.key;
+        } else if (entryValue is Map) {
+          if (mapperMap == null) return null;
+          var value = mapperMap(entryValue);
+          return constructorValue(value)..key = entry.key;
         }
       }
     }
 
-    return null ;
+    return null;
   }
 
-
-  ViewerValue< Rectangle<num> > parseClip(node) {
-    return _parseViewerValue(
-        node, ['clip', 'clipArea', 'cliparea'],
-        constructorValue: CanvasImageViewer.clipViewerValue  ,
+  ViewerValue<Rectangle<num>> parseClip(node) {
+    return _parseViewerValue(node, ['clip', 'clipArea', 'cliparea'],
+        constructorValue: CanvasImageViewer.clipViewerValue,
         mapperList: parseRectangleFromList,
-        mapperMap: parseRectangleFromMap
-    );
+        mapperMap: parseRectangleFromMap);
   }
 
-  ViewerValue< List<Rectangle<num>> > parseRectangles(node) {
-    return _parseViewerValue(
-        node, ['rectangles', 'rects'],
-        constructorValue: CanvasImageViewer.rectanglesViewerValue ,
-        mapperList: (list) => list.map( parseRectangle ).toList()
-    );
+  ViewerValue<List<Rectangle<num>>> parseRectangles(node) {
+    return _parseViewerValue(node, ['rectangles', 'rects'],
+        constructorValue: CanvasImageViewer.rectanglesViewerValue,
+        mapperList: (list) => list.map(parseRectangle).toList());
   }
 
-  ViewerValue< List<Point<num>> > parsePoints(node) {
-    return _parseViewerValue(
-        node, ['points'],
-        constructorValue: CanvasImageViewer.pointsViewerValue ,
-        mapperList: (list) => list.map( parsePoint ).toList()
-    );
+  ViewerValue<List<Point<num>>> parsePoints(node) {
+    return _parseViewerValue(node, ['points'],
+        constructorValue: CanvasImageViewer.pointsViewerValue,
+        mapperList: (list) => list.map(parsePoint).toList());
   }
 
-  ViewerValue< List<Point<num>> > parsePerspectiveFilter(node) {
+  ViewerValue<List<Point<num>>> parsePerspectiveFilter(node) {
     return _parseViewerValue(
         node, ['perspectiveFilter', 'perspectivefilter', 'perspective'],
-        constructorValue: (value) => CanvasImageViewer.perspectiveViewerValue(value) ,
-        mapperList: (list) => numsToPoints( parseNumsFromList(list) )
-    );
+        constructorValue: (value) =>
+            CanvasImageViewer.perspectiveViewerValue(value),
+        mapperList: (list) => numsToPoints(parseNumsFromList(list)));
   }
-
 
   @override
   bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
-    if ( node is Map ) {
-      var imageURL = parseImageURL(node) ;
-      if (imageURL == null) return false ;
+    if (node is Map) {
+      var imageURL = parseImageURL(node);
+      if (imageURL == null) return false;
 
-      var clip = parseClip(node) ;
-      var rectangles = parseRectangles(node) ;
-      var points = parsePoints(node) ;
-      var perspectiveFilter = parsePerspectiveFilter(node) ;
+      var clip = parseClip(node);
+      var rectangles = parseRectangles(node);
+      var points = parsePoints(node);
+      var perspectiveFilter = parsePerspectiveFilter(node);
 
-      if (clip != null || rectangles != null || points != null || perspectiveFilter != null ) {
-        return TypeImageURLRender.matchesNode(imageURL) ;
+      if (clip != null ||
+          rectangles != null ||
+          points != null ||
+          perspectiveFilter != null) {
+        return TypeImageURLRender.matchesNode(imageURL);
       }
     }
 
-    return false ;
+    return false;
   }
 
-
   @override
-  ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
-    var imageURL = parseImageURL(node) ;
-    var perspectiveFilter = parsePerspectiveFilter(node) ;
-    var clip = parseClip(node) ;
-    var rectangles = parseRectangles(node) ;
-    var points = parsePoints(node) ;
+  ValueProvider render(JSONRender render, DivElement output, dynamic node,
+      dynamic nodeOriginal, NodeKey nodeKey) {
+    var imageURL = parseImageURL(node);
+    var perspectiveFilter = parsePerspectiveFilter(node);
+    var clip = parseClip(node);
+    var rectangles = parseRectangles(node);
+    var points = parsePoints(node);
 
-    var time = parseTime(node) ;
+    var time = parseTime(node);
 
-    String urlType ;
+    String urlType;
 
     if (filterURL != null) {
-      var ret = filterURL(imageURL) ;
+      var ret = filterURL(imageURL);
       if (ret != null) {
-        imageURL = ret.url ;
-        urlType = ret.type ;
+        imageURL = ret.url;
+        urlType = ret.type;
       }
     }
 
-    Element elem = createDivInlineBlock() ;
+    Element elem = createDivInlineBlock();
 
-    var imgElemContainer = createImageElementFromURL(render, lazyLoad, imageURL, urlType) ;
+    var imgElemContainer =
+        createImageElementFromURL(render, lazyLoad, imageURL, urlType);
     imgElemContainer.style.maxWidth = '70vw';
     imgElemContainer.style.maxHeight = '40vw';
 
-    ImageElement imgElem = imgElemContainer is ImageElement ? imgElemContainer : imgElemContainer.querySelector('img') ;
+    ImageElement imgElem = imgElemContainer is ImageElement
+        ? imgElemContainer
+        : imgElemContainer.querySelector('img');
 
     var valueProviderOriginal = (parent) => nodeOriginal;
     // ignore: omit_local_variable_types
-    ValueProviderReference valueProviderRef = ValueProviderReference( valueProviderOriginal ) ;
+    ValueProviderReference valueProviderRef =
+        ValueProviderReference(valueProviderOriginal);
 
     imgElem.onLoad.listen((e) {
-      renderLoadedImage(render, node, elem, imgElem, perspectiveFilter, clip, rectangles, points, time, valueProviderRef) ;
+      renderLoadedImage(render, node, elem, imgElem, perspectiveFilter, clip,
+          rectangles, points, time, valueProviderRef);
     });
 
-    elem.children.add(imgElemContainer) ;
+    elem.children.add(imgElemContainer);
 
-    output.children.add(elem) ;
+    output.children.add(elem);
 
-    this.applyCSS(render, output, extraElements: [elem]) ;
+    this.applyCSS(render, output, extraElements: [elem]);
 
-    return valueProviderRef.asValueProvider() ;
+    return valueProviderRef.asValueProvider();
   }
 
-  void renderLoadedImage(JSONRender render, dynamic node, Element parent, ImageElement imageElement, ViewerValue< List<Point<num>> > perspectiveFilter, ViewerValue<Rectangle<num>> clip, ViewerValue<List<Rectangle<num>>> rectangles, ViewerValue<List<Point<num>>> points, DateTime time, ValueProviderReference valueProviderRef) {
+  void renderLoadedImage(
+      JSONRender render,
+      dynamic node,
+      Element parent,
+      ImageElement imageElement,
+      ViewerValue<List<Point<num>>> perspectiveFilter,
+      ViewerValue<Rectangle<num>> clip,
+      ViewerValue<List<Rectangle<num>>> rectangles,
+      ViewerValue<List<Point<num>>> points,
+      DateTime time,
+      ValueProviderReference valueProviderRef) {
     var w = imageElement.naturalWidth;
     var h = imageElement.naturalHeight;
 
-    var inputMode = render.isInputRenderMode ;
+    var inputMode = render.isInputRenderMode;
 
-    EditionType editionType ;
+    EditionType editionType;
     if (inputMode) {
       if (clip != null) {
         editionType = EditionType.CLIP;
-      }
-      else if (points != null) {
+      } else if (points != null) {
         editionType = EditionType.POINTS;
-      }
-      else if (perspectiveFilter != null) {
+      } else if (perspectiveFilter != null) {
         editionType = EditionType.PERSPECTIVE;
       }
     }
 
     var canvas = CanvasElement(width: w, height: h);
-    var gridSize = editionType == EditionType.PERSPECTIVE ? CanvasImageViewer.gridSizeViewerValue(0.05) : null ;
+    var gridSize = editionType == EditionType.PERSPECTIVE
+        ? CanvasImageViewer.gridSizeViewerValue(0.05)
+        : null;
 
-    var canvasImageViewer = CanvasImageViewer(canvas, image: imageElement,
-        perspective: perspectiveFilter , gridSize: gridSize ,
-        clip: clip, rectangles: rectangles, points: points, time: time, editable: editionType
-    ) ;
+    var canvasImageViewer = CanvasImageViewer(canvas,
+        image: imageElement,
+        perspective: perspectiveFilter,
+        gridSize: gridSize,
+        clip: clip,
+        rectangles: rectangles,
+        points: points,
+        time: time,
+        editable: editionType);
 
-    if ( editionType == EditionType.CLIP ) {
+    if (editionType == EditionType.CLIP) {
       var clipKeys = parseClipKeys(node);
 
       if (clipKeys != null) {
         valueProviderRef.valueProvider = (parent) {
-          var clipKey = clipKeys[0] ;
-          var xKey = clipKeys[1] ;
-          var yKey = clipKeys[2] ;
-          var wKey = clipKeys[3] ;
-          var hKey = clipKeys[4] ;
+          var clipKey = clipKeys[0];
+          var xKey = clipKeys[1];
+          var yKey = clipKeys[2];
+          var wKey = clipKeys[3];
+          var hKey = clipKeys[4];
 
           var clip = canvasImageViewer.clip;
-          clip = Rectangle<int>( clip.left.toInt() , clip.top.toInt() , clip.width.toInt() , clip.height.toInt() ) ;
+          clip = Rectangle<int>(clip.left.toInt(), clip.top.toInt(),
+              clip.width.toInt(), clip.height.toInt());
 
-          var nodeEdited = Map.from(node) ;
+          var nodeEdited = Map.from(node);
 
           if (xKey is num && yKey is num) {
             nodeEdited[clipKey] = [
-              clip.left ,
-              clip.top ,
-              clip.width ,
+              clip.left,
+              clip.top,
+              clip.width,
               clip.height
-            ] ;
-          }
-          else {
+            ];
+          } else {
             nodeEdited[clipKey] = {
-              xKey: clip.left ,
-              yKey: clip.top ,
-              wKey: clip.width ,
+              xKey: clip.left,
+              yKey: clip.top,
+              wKey: clip.width,
               hKey: clip.height
-            } ;
+            };
           }
 
           return nodeEdited;
         };
       }
-    }
-    else if ( editionType == EditionType.POINTS ) {
+    } else if (editionType == EditionType.POINTS) {
       valueProviderRef.valueProvider = (parent) {
-        var pointsKey = canvasImageViewer.pointsKey ;
-        var points = canvasImageViewer.points ?? [] ;
+        var pointsKey = canvasImageViewer.pointsKey;
+        var points = canvasImageViewer.points ?? [];
 
-        var nodeEdited = Map.from(node) ;
+        var nodeEdited = Map.from(node);
 
-        var pointsCoords = points.map( (p) => [p.x, p.y] ).expand( (p) => p ).map( (n) => n.toInt() ).toList();
-        nodeEdited[pointsKey] = pointsCoords ;
+        var pointsCoords = points
+            .map((p) => [p.x, p.y])
+            .expand((p) => p)
+            .map((n) => n.toInt())
+            .toList();
+        nodeEdited[pointsKey] = pointsCoords;
         return nodeEdited;
       };
-    }
-    else if ( editionType == EditionType.PERSPECTIVE ) {
+    } else if (editionType == EditionType.PERSPECTIVE) {
       valueProviderRef.valueProvider = (parent) {
-        var perspectiveKey = canvasImageViewer.perspectiveKey ;
-        var perspective = canvasImageViewer.perspective ?? [] ;
+        var perspectiveKey = canvasImageViewer.perspectiveKey;
+        var perspective = canvasImageViewer.perspective ?? [];
 
-        var nodeEdited = Map.from(node) ;
+        var nodeEdited = Map.from(node);
 
-        var perspectiveCoords = perspective.map( (p) => [p.x, p.y] ).expand( (p) => p ).map( (n) => n.toInt() ).toList() ;
-        nodeEdited[perspectiveKey] = perspectiveCoords ;
+        var perspectiveCoords = perspective
+            .map((p) => [p.x, p.y])
+            .expand((p) => p)
+            .map((n) => n.toInt())
+            .toList();
+        nodeEdited[perspectiveKey] = perspectiveCoords;
         return nodeEdited;
       };
     }
@@ -480,12 +489,8 @@ class TypeImageViewerRender extends TypeMediaRender {
     canvas.style.maxHeight = '40vw';
 
     parent.children.clear();
-    parent.children.add(canvas) ;
-    
+    parent.children.add(canvas);
+
     canvasImageViewer.render();
-
   }
-
 }
-
-
