@@ -1,17 +1,20 @@
 
 import 'dart:convert' as dart_convert ;
 import 'dart:html';
-import 'dart:math';
 
 import 'package:dom_tools/dom_tools.dart';
-import 'package:intl/intl.dart';
+
 import 'package:mercury_client/mercury_client.dart';
-import 'package:swiss_knife/swiss_knife.dart';
 
+import 'json_render_geo.dart';
+import 'json_render_types.dart';
+import 'json_render_date.dart';
+import 'json_render_collection.dart';
 import 'json_render_media.dart';
-
 import 'json_render_css.dart';
 
+
+/// Enum for render modes.
 enum JSONRenderMode {
   INPUT,
   VIEW
@@ -158,8 +161,10 @@ class JSONValueSet {
 
 }
 
+/// The JSON Render.
 class JSONRender {
 
+  /// The JSON root node to render.
   dynamic _json ;
 
   JSONRender.fromJSON(this._json) ;
@@ -185,6 +190,7 @@ class JSONRender {
 
   JSONRenderMode get renderMode => _renderMode;
 
+  /// Returns [true] if this is in input mode: [JSONRenderMode.INPUT]
   bool get isInputRenderMode => _renderMode == JSONRenderMode.INPUT ;
 
   set renderMode(JSONRenderMode value) {
@@ -192,15 +198,19 @@ class JSONRender {
     _renderMode = value;
   }
 
+  /// Rebuilds JSON from current rendered tree. If in [JSONRenderMode.INPUT]
+  /// it will update tree values.
   dynamic buildJSON() {
     if (_treeValueProvider == null) return null;
     return _treeValueProvider(null) ;
   }
 
+  /// Same as [buildJSON], but returns as [String].
   String buildJSONAsString([String ident = '  ']) {
     return convertToJSONAsString( buildJSON() , ident ) ;
   }
 
+  /// Renders JSON to a new [DivElement] and returns it.
   DivElement render() {
     var output = DivElement() ;
     renderToDiv(output) ;
@@ -209,6 +219,7 @@ class JSONRender {
 
   ValueProvider _treeValueProvider ;
 
+  /// Renders JSON to div [output].
   void renderToDiv( DivElement output ) {
     output.children.clear() ;
 
@@ -302,8 +313,6 @@ class JSONRender {
     return valueProvider ;
   }
 
-  ////
-
   List<TypeRender> get allRenders => [ ..._extendedTypeRenders , ..._defaultTypeRenders ] ;
 
   final List<TypeRender> _defaultTypeRenders = [
@@ -312,6 +321,9 @@ class JSONRender {
 
   final List<TypeRender> _extendedTypeRenders = [] ;
 
+  /// Adds a new [typeRender].
+  ///
+  /// [overwrite] If true substitutes current render of same type.
   bool addTypeRender(TypeRender typeRender, [bool overwrite = false]) {
     if (typeRender == null) return false ;
 
@@ -329,11 +341,13 @@ class JSONRender {
     return true ;
   }
 
+  /// Add all [typeRenders] to current capable renders list.
   void addAllTypeRender( List<TypeRender> typeRenders) {
     typeRenders.forEach(  addTypeRender ) ;
   }
 
-  void addAllKnownTypeRenders( ) {
+  /// Add all known [TypeRender] to capable render list.
+  void addAllKnownTypeRenders() {
 
     addTypeRender( TypePaging() ) ;
     addTypeRender( TypeTableRender(false) ) ;
@@ -348,12 +362,13 @@ class JSONRender {
 
   }
 
-
+  /// Removes a [typeRender] from capable render list.
   bool removeTypeRender(TypeRender typeRender) {
     if (typeRender == null ) return false ;
     return _extendedTypeRenders.remove(typeRender) ;
   }
 
+  /// Gets a [TypeRender] by [type] from capable render list.
   TypeRender getTypeRender(Type type) {
     for (var typeRender in _extendedTypeRenders) {
       var runtimeType = typeRender.runtimeType;
@@ -371,8 +386,7 @@ class JSONRender {
     return null ;
   }
 
-  ////
-
+  /// If [true] will ignore [null] nodes and ignore them to render.
   bool _ignoreNullNodes = false ;
   bool get ignoreNullNodes => _ignoreNullNodes;
 
@@ -380,6 +394,7 @@ class JSONRender {
     _ignoreNullNodes = value ?? false ;
   }
 
+  /// If [true] shows an arrow for each node entry.
   bool _showNodeArrow = true ;
   bool get showNodeArrow => _showNodeArrow;
 
@@ -387,6 +402,7 @@ class JSONRender {
     _showNodeArrow = value ?? true ;
   }
 
+  /// If [true] renders an opener `{` and closer `}` characters for each node.
   bool _showNodeOpenerAndCloser = true ;
   bool get showNodeOpenerAndCloser => _showNodeOpenerAndCloser;
 
@@ -396,25 +412,28 @@ class JSONRender {
 
   final List<NodeValidator> _nodeValidators = [] ;
 
+  /// Adds a node [validator]. Invalid nodes are ignored.
   bool addNodeValidator(NodeValidator validator) {
     if (validator == null || _nodeValidators.contains(validator)) return false ;
     _nodeValidators.add(validator) ;
     return true ;
   }
 
+  /// Add all [validators].
   void addAllNodeValidator( List<NodeValidator> validators ) {
     validators.forEach( addNodeValidator ) ;
   }
 
+  /// Removes a node [validator].
   bool removeNodeValidator(NodeValidator validator) {
     if (validator == null ) return false ;
     return _nodeValidators.remove(validator) ;
   }
 
-  ////
-
   final List<TypeMapper> _typeMappers = [] ;
 
+  /// Adds a [typeMapper]. A [TypeMapper] is able to convert a node to another
+  /// structure, allowing to match different types from original behavior.
   bool addTypeMapper(TypeMapper typeMapper) {
     if (typeMapper == null || _typeMappers.contains(typeMapper)) return false ;
     _typeMappers.add(typeMapper) ;
@@ -430,7 +449,46 @@ class JSONRender {
     return _typeMappers.remove(typeMapper) ;
   }
 
-  ////
+  final Set<Pattern> _hiddenNodes = {} ;
+
+  bool addHiddenNode(Pattern hiddenNodePattern) {
+    if (hiddenNodePattern == null || _hiddenNodes.contains(hiddenNodePattern)) return false ;
+    _hiddenNodes.add(hiddenNodePattern) ;
+    return true ;
+  }
+
+  void addAllHiddenNode( List<Pattern> hiddenNodesPatterns ) {
+    hiddenNodesPatterns.forEach(  addHiddenNode ) ;
+  }
+
+  bool removeHiddenNode(Pattern hiddenNodePattern) {
+    if (hiddenNodePattern == null ) return false ;
+    return _hiddenNodes.remove(hiddenNodePattern) ;
+  }
+
+  bool isHiddenNode(NodeKey nodeKey) {
+    if (nodeKey == null || _hiddenNodes.isEmpty) return false ;
+    return isHiddenNodePath( nodeKey.toString() ) ;
+  }
+
+  bool isHiddenNodePath(String nodePath) {
+    if (nodePath == null || _hiddenNodes.isEmpty) return false ;
+
+    for (var pattern in _hiddenNodes) {
+      if ( pattern is RegExp ) {
+        if ( pattern.hasMatch( nodePath ) ) return true ;
+      }
+      else if ( pattern is String ) {
+        if ( pattern == nodePath ) return true ;
+      }
+      else {
+        var allMatches = pattern.allMatches(nodePath) ;
+        if ( allMatches != null && allMatches.isNotEmpty ) return true ;
+      }
+    }
+
+    return false ;
+  }
 
   final List<TypeAction> _typeActions = [] ;
 
@@ -474,7 +532,6 @@ class JSONRender {
 
 }
 
-////////////////////////////////////////
 
 class URLFiltered {
   final String url ;
@@ -511,132 +568,6 @@ void copyElementToClipboard(Element elem) {
   }
 }
 
-////////////////////////////////////////
-
-typedef SizeProvider = int Function() ;
-
-DivElement _createClosableContent( JSONRender render, DivElement output , String textOpener , String textCloser , bool simpleContent, SizeProvider sizeProvider , String cssClass) {
-  output.style.textAlign = 'left';
-
-  var container = createDivInlineBlock() ;
-  var mainContent = createDivInlineBlock() ;
-  var subContent = createDivInlineBlock() ;
-  var contentWhenHidden = createDivInlineBlock() ;
-  var contentClipboard = createDivInlineBlock() ;
-
-  contentClipboard.style.width = '0px' ;
-  contentClipboard.style.height = '0px' ;
-  contentClipboard.style.lineHeight = '0px' ;
-
-  if (cssClass != null && cssClass.isNotEmpty) {
-    mainContent.classes.add(cssClass) ;
-    contentWhenHidden.classes.add(cssClass) ;
-  }
-
-  container.style.verticalAlign = 'top' ;
-
-  contentWhenHidden.style.display = 'none' ;
-  contentWhenHidden.text = '$textOpener ..${ sizeProvider() }.. $textCloser' ;
-
-  var arrowDown = '&#5121;' ;
-  var arrowRight = '&#5125;' ;
-
-  var elemArrow = SpanElement()..innerHtml = '$arrowDown ' ;
-
-  elemArrow.onClick.listen( (e) {
-    // if content already hidden, show it:
-    if ( mainContent.style.display == 'none' ) {
-      elemArrow.innerHtml = '$arrowDown ' ;
-      contentWhenHidden.style.display = 'none' ;
-      mainContent.style.display = null ;
-    }
-    // Hide content:
-    else {
-      elemArrow.innerHtml = '$arrowRight ' ;
-      contentWhenHidden.style.display = null ;
-      mainContent.style.display = 'none' ;
-    }
-
-    var jsonStr = render.buildJSONAsString();
-
-    print('-------------------------------------------------');
-    print(jsonStr);
-
-    contentClipboard.innerHtml = '<pre>${jsonStr}</pre>' ;
-    copyElementToClipboard(contentClipboard) ;
-    contentClipboard.text = '';
-
-  } );
-
-
-  output.children.add(elemArrow) ;
-  output.children.add(container) ;
-  container.children.add(mainContent) ;
-  container.children.add(contentWhenHidden) ;
-  container.children.add(contentClipboard) ;
-
-  if ( render.showNodeOpenerAndCloser ) {
-    var elemOpen = SpanElement()
-      ..innerHtml = simpleContent ? ' $textOpener' : ' $textOpener<br>'
-      ..style.verticalAlign = 'top' ;
-    ;
-
-    var elemClose = SpanElement()
-      ..innerHtml = simpleContent ? '&nbsp; $textCloser' : '<br>$textCloser<br>'
-    ;
-
-    mainContent.children.add(elemOpen) ;
-    mainContent.children.add(subContent) ;
-    mainContent.children.add(elemClose) ;
-  }
-  else {
-    mainContent.children.add(subContent) ;
-  }
-
-  return subContent ;
-
-}
-
-
-DivElement _createContent( JSONRender render, DivElement output , String textOpener , String textCloser , bool simpleContent, SizeProvider sizeProvider , String cssClass) {
-  output.style.textAlign = 'left';
-
-  var container = createDivInlineBlock() ;
-  var mainContent = createDivInlineBlock() ;
-  var subContent = createDivInlineBlock() ;
-
-  if (cssClass != null && cssClass.isNotEmpty) {
-    mainContent.classes.add(cssClass) ;
-  }
-
-  container.style.verticalAlign = 'top' ;
-
-  output.children.add(container) ;
-  container.children.add(mainContent) ;
-
-  if ( render.showNodeOpenerAndCloser ) {
-    var elemOpen = SpanElement()
-      ..innerHtml = simpleContent ? ' $textOpener' : ' $textOpener<br>'
-      ..style.verticalAlign = 'top' ;
-    ;
-
-    var elemClose = SpanElement()
-      ..innerHtml = simpleContent ? '&nbsp; $textCloser' : '<br>$textCloser<br>'
-    ;
-
-    mainContent.children.add(elemOpen) ;
-    mainContent.children.add(subContent) ;
-    mainContent.children.add(elemClose) ;
-  }
-  else {
-    mainContent.children.add(subContent) ;
-  }
-
-  return subContent ;
-}
-
-
-///////////////////////////////////////
 
 class NodeKey {
   final List<String> path ;
@@ -659,9 +590,12 @@ class NodeKey {
 
   NodeKey get parent => path.length > 1 ? NodeKey( List.from(path)..removeLast() ) : null ;
 
+  String _pathString ;
+
   @override
   String toString() {
-    return path.join('/') ;
+    _pathString ??= path.join('/') ;
+    return _pathString ;
   }
 
   @override
@@ -675,6 +609,7 @@ class NodeKey {
   int get hashCode => path.hashCode;
 }
 
+/// Abstract class for type renders.
 abstract class TypeRender {
 
   final String cssClass ;
@@ -713,9 +648,6 @@ abstract class TypeRender {
 }
 
 
-////////////////////////////////////////////////////////////////////////////////
-
-
 class _NodeMapping {
 
   final TypeMapper typeMapper ;
@@ -746,11 +678,51 @@ typedef NodeMatcher = bool Function(dynamic node, dynamic parent, NodeKey nodeKe
 typedef NodeMap = dynamic Function(dynamic node, dynamic parent, NodeKey nodeKey) ;
 typedef NodeUnmap = dynamic Function(dynamic node, dynamic nodeOriginal, dynamic parent, NodeKey nodeKey) ;
 
+/// Represents a node type mapper. Allows to change node tree for a better
+/// [TypeRender] matching of visualization.
 class TypeMapper {
 
+  /// Identifies a node to map.
   final NodeMatcher matcher ;
+  /// Performs the node mapping process.
   final NodeMap mapper ;
+  /// Performs the node unmapping process. Used to rebuild the JSON tree
+  /// from the current rendered tree.
+  ///
+  /// Needed to update the generated JSON
+  /// with tree inputs.
   final NodeUnmap unmapper ;
+
+  factory TypeMapper.from(dynamic matcher, dynamic mapper, [dynamic unmapper]) {
+    NodeMatcher matcherOk ;
+    NodeMap mapperOk ;
+    NodeUnmap unmapperOk ;
+
+    if ( matcher is NodeMatcher ) {
+      matcherOk = matcher ;
+    }
+    else if ( matcher is RegExp ) {
+      matcherOk = (n,p,k) {
+        var keyPath = k.toString();
+        var hasMatch = matcher.hasMatch( keyPath );
+        return hasMatch;
+      } ;
+    }
+
+    if ( mapper is NodeMap ) {
+      mapperOk = mapper ;
+    }
+
+    if ( unmapper is NodeUnmap ) {
+      unmapperOk = unmapper ;
+    }
+
+    if ( matcherOk != null && mapperOk != null ) {
+      return TypeMapper( matcherOk , mapperOk , unmapperOk ) ;
+    }
+
+    return null ;
+  }
 
   TypeMapper(this.matcher, this.mapper, [this.unmapper]);
 
@@ -773,6 +745,7 @@ typedef NodeValidator = bool Function(dynamic node, dynamic parent, NodeKey node
 
 typedef NodeAction = void Function(dynamic node, dynamic parent, NodeKey nodeKey) ;
 
+/// Action to perform when clicking in the node.
 class TypeAction {
 
   final NodeMatcher matcher ;
@@ -796,1454 +769,3 @@ class TypeAction {
   }
 
 }
-
-////////////////////////////////////////////////////////////////////////////////
-
-class TypeListRender extends TypeRender {
-
-  TypeListRender() : super('list-render');
-
-  @override
-  bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
-    return node is List ;
-  }
-
-  @override
-  ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
-    var list = (node as List) ?? [] ;
-
-    var simpleList = isSimpleList(list, 8, 10) ;
-
-    var listContent = _createClosableContent( render, output , '[' , ']' , simpleList, () => list.length, cssClass) ;
-
-    var valueSet = JSONValueSet(true) ;
-
-    for (var i = 0; i < list.length; ++i) {
-      var elem = list[i];
-
-      var elemIdx = SpanElement()..innerHtml = simpleList ? ' &nbsp; #$i: &nbsp; ' : ' &nbsp; &nbsp; #$i: &nbsp; ' ;
-      var elemContent = createDivInlineBlock();
-
-      var elemNodeKey = nodeKey.append('$i');
-      var elemValueProvider = render.renderNode(elemContent, elem, node, elemNodeKey) ;
-
-      valueSet.put(elemNodeKey, elemValueProvider) ;
-
-      if (elemValueProvider == null) continue ;
-
-      listContent.children.add(elemIdx) ;
-      listContent.children.add(elemContent) ;
-
-      if (!simpleList) {
-        listContent.children.add(BRElement());
-      }
-    }
-
-    this.applyCSS(render, output) ;
-
-    return valueSet.asValueProvider() ;
-  }
-
-  bool isSimpleList(List list, int elementsLimit, int stringLimit) {
-    if ( list.length <= elementsLimit ) {
-      if ( list.where( (e) => (e is num) || (e is bool) || (e is String && e.length <= stringLimit) ).length == list.length ) {
-        var listStr = '$list' ;
-        return listStr.length < elementsLimit * stringLimit ;
-      }
-    }
-    return false ;
-  }
-
-}
-
-
-class TypeObjectRender extends TypeRender {
-
-  TypeObjectRender() : super('object-render');
-
-  @override
-  bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
-    return node is Map ;
-  }
-
-  @override
-  ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
-    var obj = (node as Map) ?? {} ;
-
-    var simpleObj = isSimpleObject(obj, 5, 10) ;
-
-    var showNodeArrow = render.showNodeArrow ;
-
-    var objContent = showNodeArrow ?
-      _createClosableContent( render, output, '{', '}', simpleObj, () => obj.length, cssClass)
-      :
-      _createContent( render, output, '{', '}', simpleObj, () => obj.length, cssClass)
-    ;
-
-    var valueSet = JSONValueSet() ;
-
-
-    var entryI = 0 ;
-    for (var entry in obj.entries) {
-      var key = entry.key ;
-
-      var elemNodeKey = nodeKey.append(key);
-
-      var elemContent = createDivInlineBlock();
-      var elemValueProvider = render.renderNode(elemContent, entry.value, node, elemNodeKey) ;
-
-      valueSet.put(elemNodeKey, elemValueProvider) ;
-
-      if (elemValueProvider == null) continue ;
-
-      var elemKey = SpanElement()..innerHtml = showNodeArrow ? ' &nbsp; &nbsp; $key: &nbsp; ' : '&nbsp;$key: &nbsp; ' ;
-
-      elemContent.style.verticalAlign = 'top' ;
-
-      objContent.children.add(elemKey) ;
-      objContent.children.add(elemContent) ;
-
-      var isLastEntry = entryI == obj.length-1 ;
-
-      if (!isLastEntry) {
-        objContent.children.add(
-            HRElement()
-              ..style.border = 'none'
-              ..style.margin = '8px 0 0 0'
-              ..style.backgroundColor = 'none'
-              ..style.backgroundImage = 'none'
-        );
-      }
-
-      entryI++ ;
-    }
-
-    this.applyCSS(render, output) ;
-
-    return valueSet.asValueProvider() ;
-  }
-
-  bool isSimpleObject(Map obj, int elementsLimit, int stringLimit) {
-    if ( obj.length <= elementsLimit ) {
-      if (
-        obj.keys.where( (e) => (e is String && e.length <= stringLimit) ).length == obj.length
-        &&
-        obj.values.where( (e) => (e is num) || (e is bool) || (e is String && e.length <= stringLimit) ).length == obj.length
-      ) return true ;
-    }
-    return false ;
-  }
-
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-void _adjustInputWidthByValueOnKeyPress( InputElement elem , [int maxWidth = 800] ) {
-  elem.onKeyUp.listen( (e) {
-    _adjustInputWidthByValue(elem) ;
-  });
-
-  elem.onChange.listen( (e) {
-    _adjustInputWidthByValue(elem) ;
-  });
-
-  _adjustInputWidthByValue(elem) ;
-}
-
-void _adjustInputWidthByValue( InputElement elem , [int maxWidth = 800] ) {
-  var widthChars = elem.value.length+1.5 ;
-  if (widthChars < 2) widthChars = 2 ;
-
-  elem.style.width = '${widthChars}ch' ;
-  elem.style.maxWidth = '${maxWidth}px' ;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-class TypeTextRender extends TypeRender {
-
-  bool renderQuotes ;
-
-  TypeTextRender( [ bool renderQuotes = true ] ) :
-        renderQuotes = renderQuotes ?? true ,
-        super('text-render')
-  ;
-
-  @override
-  bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
-    return node is String ;
-  }
-
-  @override
-  ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
-
-    Element elem ;
-    ValueProvider valueProvider ;
-
-    if (render.renderMode == JSONRenderMode.INPUT) {
-      elem = InputElement()
-        ..value = '$node'
-        ..type = 'text'
-      ;
-      _adjustInputWidthByValueOnKeyPress(elem) ;
-      valueProvider = (parent) => normalizeJSONValuePrimitive( (elem as InputElement).value , true ) ;
-    }
-    else {
-      elem = SpanElement()..text = renderQuotes ? '"$node"' : '$node' ;
-      valueProvider = (parent) => nodeOriginal ;
-    }
-
-    output.children.add(elem) ;
-
-    this.applyCSS(render, output, extraElements: [elem]) ;
-
-    return valueProvider ;
-  }
-
-}
-
-class TypeNumberRender extends TypeRender {
-
-  TypeNumberRender() : super('number-render');
-
-  @override
-  bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
-    return node is num ;
-  }
-
-  @override
-  ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
-
-    Element elem ;
-    ValueProvider valueProvider ;
-
-    if (render.renderMode == JSONRenderMode.INPUT) {
-      elem = InputElement()
-        ..value = '$node'
-        ..type = 'number'
-      ;
-      _adjustInputWidthByValueOnKeyPress(elem) ;
-      valueProvider = (parent) => normalizeJSONValueNumber(  (elem as InputElement).value ) ;
-    }
-    else {
-      elem = SpanElement()..text = '$node' ;
-      valueProvider = (parent) => nodeOriginal ;
-    }
-
-    output.children.add(elem) ;
-
-    this.applyCSS(render, output, extraElements: [elem]) ;
-
-    return valueProvider ;
-  }
-
-}
-
-class TypeBoolRender extends TypeRender {
-
-  TypeBoolRender() : super('bool-render');
-
-  @override
-  bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
-    return node is bool ;
-  }
-
-  @override
-  ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
-    var val = node is bool ? node : false ;
-
-    Element elem ;
-    ValueProvider valueProvider ;
-
-    if (render.renderMode == JSONRenderMode.INPUT) {
-      elem = InputElement()
-        ..checked = val
-        ..type = 'checkbox'
-      ;
-      valueProvider = (parent) => (elem as InputElement).checked ;
-    }
-    else {
-      elem = SpanElement()..text = '$val' ;
-      valueProvider = (parent) => nodeOriginal ;
-    }
-
-    output.children.add(elem) ;
-
-    this.applyCSS(render, output, extraElements: [elem]) ;
-
-    return valueProvider ;
-  }
-
-}
-
-class TypeNullRender extends TypeRender {
-
-  TypeNullRender() : super('null-render');
-
-  @override
-  bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
-    return node == null ;
-  }
-
-  @override
-  ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
-    var elem = SpanElement()..text = 'null' ;
-    output.children.add(elem) ;
-    var valueProvider = VALUE_PROVIDER_NULL ;
-
-    this.applyCSS(render, output) ;
-
-    return valueProvider ;
-  }
-
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-class TypeURLRender extends TypeRender {
-
-  final FilterURL filterURL  ;
-
-  TypeURLRender( { this.filterURL } ) : super('url-render') ;
-
-  @override
-  bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
-    if ( isHttpHURL(node) ) {
-      return true ;
-    }
-    return false ;
-  }
-
-  @override
-  ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
-    var urlLabel = '$node';
-    var url = urlLabel.trim() ;
-    var target ;
-
-    if (filterURL != null) {
-      var ret = filterURL(url) ;
-      if (ret != null) {
-        url = ret.url ;
-        urlLabel = ret.label ;
-        target = ret.target ;
-      }
-    }
-
-    if (target != null && target.trim().isEmpty) target = null ;
-
-    Element elem ;
-    ValueProvider valueProvider ;
-
-    if (render.renderMode == JSONRenderMode.INPUT) {
-      var input = InputElement()
-        ..value = urlLabel
-        ..type = 'url'
-      ;
-
-      elem = input ;
-
-      _adjustInputWidthByValueOnKeyPress(elem) ;
-
-      elem.onDoubleClick.listen( (e) {
-        var inputURL = input.value ;
-
-        if (inputURL == urlLabel) {
-          window.open(url, target) ;
-        }
-        else {
-          window.open(inputURL, target) ;
-        }
-      }) ;
-
-      valueProvider = (parent) => (elem as InputElement).value ;
-    }
-    else {
-      var a = AnchorElement(href: url)
-        ..text = urlLabel
-      ;
-
-      if (target != null) {
-        a.target = target ;
-      }
-
-      elem = a ;
-
-      valueProvider = (parent) => nodeOriginal ;
-    }
-
-    output.children.add(elem) ;
-
-    this.applyCSS(render, output, extraElements: [elem]) ;
-
-    return valueProvider ;
-  }
-
-}
-
-class TypeEmailRender extends TypeRender {
-
-  TypeEmailRender() : super('email-render') ;
-
-  @override
-  bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
-    if ( isEmail(node) ) {
-      return true ;
-    }
-    return false ;
-  }
-
-  @override
-  ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
-    var emailLabel = '$node';
-    var email = emailLabel.trim() ;
-
-    Element elem ;
-    ValueProvider valueProvider ;
-
-    if (render.renderMode == JSONRenderMode.INPUT) {
-      var input = InputElement()
-        ..value = emailLabel
-        ..type = 'email'
-      ;
-
-      elem = input ;
-
-      _adjustInputWidthByValueOnKeyPress(elem) ;
-
-      elem.onDoubleClick.listen( (e) {
-        var inputEmail = input.value ;
-
-        if (inputEmail == emailLabel) {
-          window.open('mailto:$email', null) ;
-        }
-        else {
-          window.open('mailto:$inputEmail', null) ;
-        }
-      }) ;
-
-      valueProvider = (parent) => (elem as InputElement).value ;
-    }
-    else {
-      var a = AnchorElement(href: 'mailto:$email')
-        ..text = emailLabel
-      ;
-
-      elem = a ;
-
-      valueProvider = (parent) => nodeOriginal ;
-    }
-
-    output.children.add(elem) ;
-
-    this.applyCSS(render, output, extraElements: [elem]) ;
-
-    return valueProvider ;
-  }
-
-}
-
-final DATE_FORMAT_DATETIME_LOCAL = DateFormat('yyyy-MM-ddTHH:mm:ss', Intl.getCurrentLocale()) ;
-final DATE_FORMAT_YYYY_MM_DD = DateFormat('yyyy/MM/dd', Intl.getCurrentLocale()) ;
-final DATE_FORMAT_YYYY_MM_DD_HH_MM_SS = DateFormat('yyyy/MM/dd HH:mm:ss', Intl.getCurrentLocale()) ;
-
-final DATE_REGEXP_YYYY_MM_DD = RegExp(r'(?:\d\d\d\d/\d\d/\d\d|\d\d\d\d-\d\d-\d\d)') ;
-final DATE_REGEXP_YYYY_MM_DD_HH_MM_SS = RegExp(r'(?:\d\d\d\d/\d\d/\d\d|\d\d\d\d-\d\d-\d\d) \d\d:\d\d:\d\d') ;
-
-class TypeDateRender extends TypeRender {
-
-  TypeDateRender() : super('date-render');
-
-  @override
-  bool matches(node, nodeParent, NodeKey nodeKey) {
-    if (node is String) {
-      if ( DATE_REGEXP_YYYY_MM_DD.hasMatch(node) ) return true ;
-      if ( DATE_REGEXP_YYYY_MM_DD_HH_MM_SS.hasMatch(node) ) return true ;
-    }
-    return false ;
-  }
-
-  @override
-  ValueProvider render(JSONRender render, DivElement output, node, nodeOriginal, NodeKey nodeKey) {
-    var s = node as String ;
-    var showHour = DATE_REGEXP_YYYY_MM_DD_HH_MM_SS.hasMatch(s) ;
-    var dateTime = DateTime.parse(s).toLocal() ;
-
-    Element elem ;
-    ValueProvider valueProvider ;
-
-    if (render.renderMode == JSONRenderMode.INPUT) {
-      var dateTimeLocal = DATE_FORMAT_DATETIME_LOCAL.format(dateTime) ;
-
-      elem = InputElement()
-        ..value = dateTimeLocal
-        ..type = 'datetime-local'
-      ;
-
-      valueProvider = (parent) {
-        var time = DateTime.parse( (elem as InputElement).value );
-        var dateTimeStr = showHour ? DATE_FORMAT_YYYY_MM_DD_HH_MM_SS.format(time) : DATE_FORMAT_YYYY_MM_DD.format(time) ;
-        return dateTimeStr ;
-      } ;
-    }
-    else {
-      var dateTimeStr = showHour ? DATE_FORMAT_YYYY_MM_DD_HH_MM_SS.format(dateTime) : DATE_FORMAT_YYYY_MM_DD.format(dateTime) ;
-
-      elem = SpanElement()..text = dateTimeStr ;
-
-      elem.onClick.listen( (e) {
-        copyElementToClipboard(elem);
-      } ) ;
-
-      valueProvider = (parent) => nodeOriginal ;
-    }
-
-    output.children.add(elem) ;
-
-    this.applyCSS(render, output, extraElements: [elem]) ;
-
-    return valueProvider ;
-  }
-
-}
-
-class TypeUnixEpochRender extends TypeRender {
-
-  final bool inMilliseconds ;
-  TypeUnixEpochRender( [bool inMilliseconds] ) :
-        inMilliseconds = inMilliseconds ?? true ,
-        super('unix-epoch-render')
-  ;
-
-  bool get inSeconds => !inMilliseconds ;
-
-  bool isInUnixEpochRange(num val) {
-    if (inMilliseconds) {
-      return val > 946692000000 && val < 32503690800000 ;
-    }
-    else {
-      return val > 946692000 && val < 32503690800 ;
-    }
-  }
-
-  int parseUnixEpoch(node) {
-    if (node is num) {
-      return isInUnixEpochRange(node) ? node.toInt() : null ;
-    }
-    else if (node is String) {
-      var s = node.trim() ;
-      if ( RegExp(r'^\d+$').hasMatch(s) ) {
-        var n = int.parse(s) ;
-
-        if ( isInUnixEpochRange(n) ) {
-          return inMilliseconds ? n : n*1000 ;
-        }
-      }
-    }
-    return null ;
-  }
-
-  ///////////////////////
-
-  @override
-  bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
-    return parseUnixEpoch(node) != null ;
-  }
-
-  DateTime toDateTime(int unixEpoch, bool alreadyInMilliseconds) {
-    return DateTime.fromMillisecondsSinceEpoch( alreadyInMilliseconds ? unixEpoch : unixEpoch*1000 ) ;
-  }
-
-  int toUnixEpoch(String value) {
-    if ( value == null ) return null ;
-    value = value.trim() ;
-    if ( value.isEmpty ) return null ;
-
-    if ( RegExp(r'^\d+$').hasMatch(value) ) return int.parse(value) ;
-
-    return DateTime.parse(value).millisecondsSinceEpoch ;
-  }
-
-  @override
-  ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
-    var unixEpoch = parseUnixEpoch(node) ;
-    var dateTime = toDateTime(unixEpoch, true).toLocal() ;
-
-    Element elem ;
-    ValueProvider valueProvider ;
-
-    if (render.renderMode == JSONRenderMode.INPUT) {
-      var dateTimeLocal = DATE_FORMAT_DATETIME_LOCAL.format(dateTime) ;
-
-      elem = InputElement()
-        ..value = dateTimeLocal
-        ..type = 'datetime-local'
-      ;
-      valueProvider = (parent) {
-        var time = toUnixEpoch( (elem as InputElement).value );
-
-        var timeDiff = unixEpoch - time ;
-        if (timeDiff > 0 && timeDiff <= 1000) {
-          time += timeDiff ;
-        }
-
-        return time ;
-      } ;
-    }
-    else {
-      var dateTimeStr = DATE_FORMAT_YYYY_MM_DD_HH_MM_SS.format(dateTime) ;
-
-      elem = SpanElement()..text = dateTimeStr ;
-
-      elem.onClick.listen( (e) {
-        copyElementToClipboard(elem);
-
-        var val = '${ elem.text }' ;
-        if ( RegExp(r'^\d+$').hasMatch(val) ) {
-          elem.text = dateTimeStr ;
-        }
-        else {
-          elem.text = '$unixEpoch' ;
-        }
-      } ) ;
-
-      valueProvider = (parent) => nodeOriginal ;
-    }
-
-    output.children.add(elem) ;
-
-    this.applyCSS(render, output, extraElements: [elem]) ;
-
-    return valueProvider ;
-  }
-
-}
-
-class TypeTimeRender extends TypeRender {
-
-  final bool inMilliseconds ;
-
-  final List<String> _allowedKeys ;
-
-  TypeTimeRender( [bool inMilliseconds , this._allowedKeys ] ) :
-        inMilliseconds = inMilliseconds ?? true ,
-        super('time-render')
-  ;
-
-  bool get inSeconds => !inMilliseconds ;
-
-  List<String> get allowedKeys => List.from(_allowedKeys).cast() ;
-
-  bool isTimeInRange(num val) {
-    if (inMilliseconds) {
-      return val > -86400000000 && val < 86400000000 ;
-    }
-    else {
-      return val > -86400000 && val < 86400000 ;
-    }
-  }
-
-  int parseTime(node) {
-    if (node is num) {
-      return isTimeInRange(node) ? node.toInt() : null ;
-    }
-    else if (node is String) {
-      var s = node.trim() ;
-      if ( RegExp(r'^\d+$').hasMatch(s) ) {
-        var n = int.parse(s) ;
-        if (isTimeInRange(n)) {
-          return inMilliseconds ? n : n*1000 ;
-        }
-      }
-    }
-    return null ;
-  }
-
-  ///////////////////////
-
-  @override
-  bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
-    return parseTime(node) != null && _isAllowedKey(nodeKey) ;
-  }
-
-  bool _isAllowedKey(NodeKey nodeKey) {
-    if (allowedKeys == null || allowedKeys.isEmpty) return false ;
-
-    var leafKey = nodeKey.leafKey.toLowerCase() ;
-
-    for (var k in allowedKeys) {
-      if ( k.toLowerCase() == leafKey ) return true ;
-    }
-
-    return false ;
-  }
-
-  @override
-  ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
-    var time = parseTime(node) ;
-    var timeOriginal = inMilliseconds ? time : time/1000 ;
-
-    Element elem ;
-    ValueProvider valueProvider ;
-
-    if (render.renderMode == JSONRenderMode.INPUT) {
-      elem = InputElement()
-        ..value = '$timeOriginal'
-        ..type = 'number'
-      ;
-
-      valueProvider = (parent) {
-        var time = parseInt( (elem as InputElement).value );
-        return time ;
-      } ;
-    }
-    else {
-      var dateTimeStr = formatTimeMillis(time) ;
-
-      elem = SpanElement()..text = dateTimeStr ;
-
-      elem.onClick.listen( (e) {
-        copyElementToClipboard(elem);
-
-        var val = '${ elem.text }' ;
-        if ( RegExp(r'^\d+$').hasMatch(val) ) {
-          elem.text = dateTimeStr ;
-        }
-        else {
-          elem.text = '$timeOriginal' ;
-        }
-      } ) ;
-
-      valueProvider = (parent) => nodeOriginal ;
-    }
-
-    output.children.add(elem) ;
-
-    this.applyCSS(render, output, extraElements: [elem]) ;
-
-    return valueProvider ;
-  }
-
-}
-
-
-class TypePercentageRender extends TypeRender {
-
-  final int precision ;
-  final List<String> _allowedKeys ;
-
-  TypePercentageRender( [int precision , this._allowedKeys ] ) :
-        precision = precision != null && precision >= 0 ? precision : 2 ,
-        super('percentage-render')
-  ;
-
-  List<String> get allowedKeys => List.from(_allowedKeys).cast() ;
-
-  ///////////////////////
-
-  @override
-  bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
-    return node is num && _isAllowedKey(nodeKey) ;
-  }
-
-  bool _isAllowedKey(NodeKey nodeKey) {
-    if (allowedKeys == null || allowedKeys.isEmpty) return false ;
-
-    var leafKey = nodeKey.leafKey.toLowerCase() ;
-
-    for (var k in allowedKeys) {
-      if ( k.toLowerCase() == leafKey ) return true ;
-    }
-
-    return false ;
-  }
-
-  @override
-  ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
-    var percent = parsePercent(node) ;
-
-    Element elem ;
-    ValueProvider valueProvider ;
-
-    if (render.renderMode == JSONRenderMode.INPUT) {
-      elem = InputElement()
-        ..value = '$percent'
-        ..type = 'range'
-      ;
-
-      valueProvider = (parent) {
-        var n = parsePercent( (elem as InputElement).value );
-        return n ;
-      } ;
-    }
-    else {
-      var percentStr = formatPercent(percent, precision) ;
-
-      elem = SpanElement()..text = percentStr ;
-
-      valueProvider = (parent) => nodeOriginal ;
-    }
-
-    output.children.add(elem) ;
-
-    this.applyCSS(render, output, extraElements: [elem]) ;
-
-    return valueProvider ;
-  }
-
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-
-class Geolocation {
-
-  static Future<Geolocation> getCurrentGeolocation() async {
-      print('Geolocation.getCurrentGeolocation> ...') ;
-      var geolocation = window.navigator.geolocation ;
-      if (geolocation == null) return null ;
-      var currentPosition = await geolocation.getCurrentPosition( enableHighAccuracy: true , timeout: Duration(seconds: 30) , maximumAge: Duration( minutes: 10 ) ) ;
-      print('Geolocation.getCurrentGeolocation> $currentPosition') ;
-      var coords = currentPosition.coords;
-      return Geolocation( coords.latitude , coords.longitude ) ;
-  }
-
-  static final RegExp GEOLOCATION_FORMAT = RegExp(r'([-=]?)(\d+[,.]?\d*)\s*[°o]?\s*(\w)') ;
-
-  static num parseLatitudeOrLongitudeValue(String s, [bool onlyWithCardinals = false]) {
-    onlyWithCardinals ??= false ;
-
-    var match = GEOLOCATION_FORMAT.firstMatch(s) ;
-    if ( match == null ) return null ;
-
-    var signal = match.group(1) ;
-    var number = match.group(2) ;
-    var cardinal = match.group(3) ;
-
-    if ( signal != null && signal.isNotEmpty ) {
-      if (onlyWithCardinals) return null ;
-      return double.parse('$signal$number') ;
-    }
-    else if ( cardinal != null && cardinal.isNotEmpty ) {
-      cardinal = cardinal.toUpperCase() ;
-
-      switch (cardinal) {
-        case 'N': return double.parse('$number') ;
-        case 'S': return double.parse('-$number') ;
-        case 'E': return double.parse('$number') ;
-        case 'W': return double.parse('-$number') ;
-      }
-    }
-
-    if (onlyWithCardinals) return null ;
-    return double.parse(number) ;
-  }
-
-  static String formatLatitude(num lat) {
-    return lat >= 0 ? '$lat°E' : '$lat°W' ;
-  }
-
-  static String formatLongitude(num long) {
-    return long >= 0 ? '$long°N' : '$long°S' ;
-  }
-
-  static String formatGeolocation(Point geo) {
-    return formatLatitude( geo.x ) +' '+ formatLongitude( geo.y ) ;
-  }
-
-  ///////////////////////////////////////////////////
-
-  num _latitude ;
-  num _longitude ;
-
-  Geolocation(this._latitude, this._longitude) {
-    if (_latitude == null || _longitude == null) throw ArgumentError('Invalid coords: $_latitude $longitude') ;
-  }
-
-  factory Geolocation.fromCoords(String coords, [bool onlyWithCardinals]) {
-    coords = coords.trim() ;
-
-    var parts = coords.split(RegExp(r'\s+')) ;
-    if (parts.length < 2) return null ;
-
-    var lat = parseLatitudeOrLongitudeValue(parts[0] , onlyWithCardinals) ;
-    var long = parseLatitudeOrLongitudeValue(parts[1] , onlyWithCardinals) ;
-
-    return lat != null && long != null ? Geolocation(lat, long) : null ;
-  }
-
-  num get latitude => _latitude;
-  num get longitude => _longitude;
-
-  Point<num> asPoint() => Point(_latitude, _longitude) ;
-
-  @override
-  String toString() {
-    return formatGeolocation( asPoint() ) ;
-  }
-
-  String windowID(String prefix) {
-    return '${prefix}__${latitude}__${longitude}';
-  }
-
-  String googleMapsURL() {
-    return 'https://www.google.com/maps/search/?api=1&query=$_latitude,$longitude' ;
-  }
-
-  Future<String> googleMapsDirectionsURL() async {
-    var currentGeo = await getCurrentGeolocation() ;
-    if (currentGeo == null) return null ;
-    return 'https://www.google.com/maps/dir/?api=1&origin=${ currentGeo.latitude },${ currentGeo.longitude }&destination=$_latitude,$longitude' ;
-  }
-
-
-  String openGoogleMaps() {
-    var url = googleMapsURL();
-    print('Geolocation.openGoogleMaps> $url') ;
-    window.open(url, windowID('googlemaps'));
-    return url ;
-  }
-
-  Future<String> openGoogleMapsDirections() async {
-    print('Geolocation.openGoogleMapsDirections> ...') ;
-    var url = await googleMapsDirectionsURL();
-    print('Geolocation.openGoogleMapsDirections> $url') ;
-    window.open(url, windowID('googlemaps_directions'));
-    return url ;
-  }
-
-
-}
-
-class TypeGeolocationRender extends TypeRender {
-
-  final bool openDirections ;
-
-  TypeGeolocationRender( [ this.openDirections = false ]) : super('geolocation-render') ;
-
-  @override
-  bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
-    return parseLatitudeLongitude(node) != null ;
-  }
-
-  Geolocation parseLatitudeLongitude(dynamic node) {
-    if ( node is Map ) {
-      var latitudeEntry = findKeyEntry(node, ['latitude'] ) ;
-      var longitudeEntry = findKeyEntry(node, ['longitude'] ) ;
-
-      if ( latitudeEntry != null && longitudeEntry != null ) {
-
-        if ( latitudeEntry.value is num && longitudeEntry.value is num ) {
-          return Geolocation( latitudeEntry.value , longitudeEntry.value ) ;
-        }
-        else if ( latitudeEntry.value is String && longitudeEntry.value is String ) {
-          var lat = Geolocation.parseLatitudeOrLongitudeValue(latitudeEntry.value) ;
-          var long = Geolocation.parseLatitudeOrLongitudeValue(longitudeEntry.value) ;
-          return Geolocation( lat, long ) ;
-        }
-      }
-    }
-    else if ( node is String ) {
-      return Geolocation.fromCoords(node , true) ;
-    }
-
-    return null ;
-  }
-
-
-  @override
-  ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
-    var geo = parseLatitudeLongitude(node) ;
-    var nodeIsMap = node is Map ;
-
-    Element geoElem ;
-    ValueProvider valueProvider ;
-
-    if (render.renderMode == JSONRenderMode.INPUT) {
-      var geoStr = geo.toString() ;
-
-      var input = InputElement()
-        ..value = geoStr
-        ..type = 'text'
-      ;
-
-      input.onDoubleClick.listen( (e) {
-        var geo2 = Geolocation.fromCoords( input.value ) ;
-        openGoogleMaps(geo2) ;
-      } ) ;
-
-      var button = SpanElement()
-        ..innerHtml = ' &#8853;'
-        ..style.fontSize = '125%'
-        ..style.cursor = 'pointer'
-      ;
-
-      button.onClick.listen( (e) async {
-        print('Getting CurrentGeolocation...');
-        var myGeolocation = await Geolocation.getCurrentGeolocation() ;
-        print('CurrentGeolocation: $myGeolocation');
-        input.value = myGeolocation.toString();
-      } ) ;
-
-      geoElem = createDivInlineBlock() ;
-
-      geoElem.children.add(input) ;
-      geoElem.children.add(button) ;
-
-      valueProvider = (parent) {
-        final value = input.value;
-        var geo2 = Geolocation.fromCoords(value);
-
-        if (nodeIsMap) {
-          return {'latitude': geo2.latitude, 'longitude': geo2.longitude} ;
-        }
-        else {
-          return geo2 ;
-        }
-      } ;
-    }
-    else {
-      var geoStr = geo.toString() ;
-
-      var elem = SpanElement()..text = geoStr ;
-
-      elem.onClick.listen( (e) {
-        copyElementToClipboard(elem);
-        openGoogleMaps(geo) ;
-      } ) ;
-
-      geoElem = elem ;
-
-      valueProvider = (parent) => nodeOriginal ;
-    }
-
-    output.children.add( SpanElement()..innerHtml = '&#x1F4CD;' ) ;
-    output.children.add( geoElem ) ;
-
-    this.applyCSS(render, output, extraElements: [geoElem]) ;
-
-    return valueProvider ;
-  }
-
-  void openGoogleMaps( Geolocation geolocation ) {
-    if (geolocation == null) return ;
-
-    print('openGoogleMaps> openDirections: $openDirections') ;
-
-    if ( openDirections ) {
-      geolocation.openGoogleMapsDirections() ;
-    }
-    else {
-      geolocation.openGoogleMaps() ;
-    }
-  }
-
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-
-class TypeSelectRender extends TypeRender {
-
-  TypeSelectRender() : super('select-render') ;
-
-  @override
-  bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
-    if ( node is List ) {
-      var valueMapEntriesSize = node.whereType<Map>().map( (entry) => entry.length == 2 && entry.containsKey('value') && entry.containsKey('label')  ).length ;
-      return valueMapEntriesSize == node.length ;
-    }
-
-    return false ;
-  }
-
-  @override
-  ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
-    // ignore: omit_local_variable_types
-    List<Map> options = (node as List).cast() ;
-
-    var elem = SelectElement();
-
-    for (var opt in options) {
-      var optionElement = OptionElement( value: opt['value'] , data: opt['label'] ) ;
-      elem.add(optionElement, null) ;
-    }
-
-    ValueProvider valueProvider = (parent) {
-      return elem.options.map( (opt) {
-        // ignore: omit_local_variable_types
-        Map<String, dynamic> map = { 'value': opt.value , 'label': opt.label };
-        if (opt.selected) {
-          map['selected'] = true ;
-        }
-        return map;
-      } ).toList() ;
-    } ;
-
-    if (render.renderMode != JSONRenderMode.INPUT) {
-      elem.disabled = true ;
-    }
-
-    output.children.add(elem) ;
-
-    this.applyCSS(render, output, extraElements: [elem]) ;
-
-    return valueProvider ;
-  }
-
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-
-class TypePaging extends TypeRender {
-
-  TypePaging() : super('paging-render');
-
-  @override
-  bool matches(node, nodeParent, NodeKey nodeKey) {
-    if ( node is Map ) {
-      var paging = JSONPaging.from(node) ;
-      return paging != null ;
-    }
-    return false ;
-  }
-
-  @override
-  ValueProvider render(JSONRender render, DivElement output, node, nodeOriginal, NodeKey nodeKey) {
-    var paging = JSONPaging.from(node) ;
-
-    var needsPaging = paging.needsPaging ;
-
-    var valueSet = JSONValueSet(true) ;
-
-    var table = TableElement() ;
-
-    if (needsPaging) {
-      var tHeader = table.createTHead() ;
-      var headerRow = tHeader.addRow();
-
-      this.applyCSS(render, headerRow) ;
-
-      var cell = headerRow.addCell();
-      cell.style.fontWeight = 'bold' ;
-
-      var pagingDiv = _createPagingDiv(render, output, node , nodeOriginal, nodeKey, paging);
-      cell.children.add( pagingDiv ) ;
-    }
-
-    {
-      var tbody = table.createTBody();
-
-      var entry = paging.elements ;
-      var entryNodeKey = nodeKey.append( paging.elementsEntryKey );
-
-      bool valid = render.validateNode(entry, node, entryNodeKey) ;
-
-      if (valid) {
-        var valueSetEntry = JSONValueSet() ;
-
-        valueSet.put(entryNodeKey, valueSetEntry.asValueProvider()) ;
-
-        var row = tbody.addRow();
-
-        this.applyCSS(render, row) ;
-
-        var cell = row.addCell() ;
-
-        var elemContent = createDivInlineBlock();
-        var elemValueProvider = render.renderNode(elemContent, entry, node, entryNodeKey) ;
-
-        valueSetEntry.put(entryNodeKey, elemValueProvider) ;
-
-        if (elemValueProvider != null) {
-          elemContent.style.verticalAlign = 'top' ;
-          cell.children.add(elemContent) ;
-        }
-      }
-      else {
-        valueSet.put(entryNodeKey, null) ;
-      }
-
-    }
-
-    if (needsPaging) {
-      var tFoot = table.createTFoot() ;
-      var footRow = tFoot.addRow();
-
-      this.applyCSS(render, footRow) ;
-
-      var cell = footRow.addCell();
-      cell.style.fontWeight = 'bold' ;
-
-      var pagingDiv = _createPagingDiv(render, output, node , nodeOriginal, nodeKey, paging);
-      cell.children.add( pagingDiv ) ;
-    }
-
-    output.children.add(table) ;
-
-    this.applyCSS(render, output, extraElements: [table]) ;
-
-    return valueSet.asValueProvider() ;
-  }
-
-  DivElement _createPagingDiv(JSONRender render, DivElement output, node, nodeOriginal, NodeKey nodeKey, JSONPaging paging) {
-    var pagingDiv = createDivInline() ;
-
-    var prev = SpanElement()
-      ..style.cursor = 'pointer'
-      ..innerHtml = '&#x2190; '
-    ;
-
-    var current = SpanElement()
-      ..text = '${ paging.currentPage+1 }'
-    ;
-
-    var next = SpanElement()
-      ..style.cursor = 'pointer'
-      ..innerHtml = ' &#x2192;'
-    ;
-
-    prev.onClick.listen((e) async {
-      prev.text = '... ' ;
-      var prevPaging = await paging.requestPreviousPage() ;
-      if (prevPaging != null) {
-        output.children.clear();
-        this.render(render, output, prevPaging, nodeOriginal, nodeKey);
-      }
-    });
-
-    next.onClick.listen((e) async {
-      next.innerHtml = ' ...' ;
-      var nextPaging = await paging.requestNextPage() ;
-      if (nextPaging != null) {
-        output.children.clear();
-        this.render(render, output, nextPaging, nodeOriginal, nodeKey);
-      }
-    });
-
-    if (paging.isFirstPage) {
-      pagingDiv.children.add( current ) ;
-      pagingDiv.children.add( next ) ;
-    }
-    else if (paging.isLastPage) {
-      pagingDiv.children.add( prev ) ;
-      pagingDiv.children.add( current ) ;
-    }
-    else {
-      pagingDiv.children.add( prev ) ;
-      pagingDiv.children.add( current ) ;
-      pagingDiv.children.add( next ) ;
-    }
-
-    return pagingDiv ;
-  }
-
-}
-
-class TypeTableRender extends TypeRender {
-
-  bool _ignoreNullColumns ;
-
-  TypeTableRender([bool ignoreNullColumns]) : super('table-render') {
-    this.ignoreNullColumns = ignoreNullColumns ;
-  }
-
-  bool get ignoreNullColumns => _ignoreNullColumns;
-
-  set ignoreNullColumns(bool value) {
-    _ignoreNullColumns = value ?? false ;
-  }
-
-  final Set<String> _ignoredColumns = {} ;
-
-  List<String> get ignoredColumns => _ignoredColumns.toList() ;
-
-  List<String> clearIgnoreColumns() {
-    var list = _ignoredColumns.toList() ;
-    _ignoredColumns.clear() ;
-    return list ;
-  }
-
-  bool ignoreColumn(String column, [bool ignore]) {
-    if (column == null) return false ;
-    column = column.trim() ;
-    if (column.isEmpty) return false ;
-
-    ignore ??= true ;
-
-    if (ignore) {
-      _ignoredColumns.add(column);
-      return true ;
-    }
-    else {
-      _ignoredColumns.remove(column);
-      return false ;
-    }
-  }
-
-  bool isIgnoredColumn(String column) {
-    if (column == null || _ignoredColumns.isEmpty ) return false ;
-    return _ignoredColumns.contains(column) ;
-  }
-
-  //////////
-
-  @override
-  bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
-    if ( node is List ) {
-      var nonMap = node.firstWhere( (e) => !(e is Map) , orElse: () => null) ;
-      return nonMap == null ;
-    }
-    return false ;
-  }
-
-  @override
-  ValueProvider render(JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
-    // ignore: omit_local_variable_types
-    List<Map> list = (node as List).cast() ?? [] ;
-
-    var valueSet = JSONValueSet(true) ;
-
-    var columns = getCollectionColumns(list) ;
-
-    var contentClipboard = createDivInlineBlock()
-        ..style.width = '0px'
-        ..style.height = '0px'
-        ..style.display = 'none'
-    ;
-
-    output.style.maxWidth = '98vw' ;
-    output.style.overflow = 'auto' ;
-
-    var table = TableElement() ;
-
-    {
-      var tHeader = table.createTHead() ;
-
-      var headerRow = tHeader.addRow();
-
-      this.applyCSS(render, headerRow) ;
-
-      headerRow.onClick.listen( (e) {
-        var jsonStr = render.buildJSONAsString();
-
-        print('-------------------------------------------------');
-        print(jsonStr);
-
-        contentClipboard.style.display = null ;
-
-        contentClipboard.innerHtml = '<pre>${jsonStr}</pre>' ;
-        copyElementToClipboard(contentClipboard) ;
-        contentClipboard.text = '';
-
-        contentClipboard.style.display = 'none' ;
-      } );
-
-      for (var columnEntry in columns.entries) {
-        var columnKey = columnEntry.key ;
-        var columnWithValue = columnEntry.value ;
-
-        if ( (ignoreNullColumns && !columnWithValue) || isIgnoredColumn(columnKey) ) continue ;
-
-        var cell = headerRow.addCell();
-        cell.text = columnKey;
-        cell.style.fontWeight = 'bold' ;
-      }
-    }
-
-    {
-      var tbody = table.createTBody();
-
-      for (var i = 0; i < list.length; ++i) {
-        var entry = list[i];
-        var entryNodeKey = nodeKey.append('$i');
-
-        bool valid = render.validateNode(entry, node, entryNodeKey) ;
-        if (!valid) {
-          valueSet.put(entryNodeKey, null) ;
-          continue ;
-        }
-
-        var valueSetEntry = JSONValueSet() ;
-
-        valueSet.put(entryNodeKey, valueSetEntry.asValueProvider()) ;
-
-        var row = tbody.addRow();
-
-        var rowCSS = i % 2 == 0 ? 'table-row1-render' : 'table-row2-render' ;
-
-        this.applyCSS(render, row, cssClass: rowCSS) ;
-
-        for (var columnEntry in columns.entries) {
-          var columnKey = columnEntry.key ;
-          var columnWithValue = columnEntry.value ;
-
-          if ( ignoreNullColumns && !columnWithValue ) {
-            if ( entry.containsKey(columnKey) ) {
-              assert( entry[columnKey] == null , 'Not null: ${ entry[columnKey] }' ) ;
-              var elemNodeKey = entryNodeKey.append(columnKey);
-              valueSetEntry.put(elemNodeKey, VALUE_PROVIDER_NULL);
-            }
-            continue ;
-          }
-          else if ( isIgnoredColumn(columnKey) ) {
-            if ( entry.containsKey(columnKey) ) {
-              var val = entry[columnKey] ;
-              var elemNodeKey = entryNodeKey.append(columnKey);
-              valueSetEntry.put(elemNodeKey, (parent) => val);
-            }
-            continue ;
-          }
-
-          var cell = row.addCell() ;
-
-          if ( entry.containsKey(columnKey) ) {
-            var val = entry[columnKey] ;
-
-            var elemNodeKey = entryNodeKey.append(columnKey);
-
-            var elemContent = createDivInlineBlock();
-            var elemValueProvider = render.renderNode(elemContent, val, entry, elemNodeKey) ;
-
-            valueSetEntry.put(elemNodeKey, elemValueProvider) ;
-
-            if (elemValueProvider == null) continue ;
-
-            elemContent.style.verticalAlign = 'top' ;
-
-            cell.children.add(elemContent) ;
-          }
-
-        }
-
-      }
-    }
-
-    output.children.add(contentClipboard);
-    output.children.add(table) ;
-
-    this.applyCSS(render, output, extraElements: [table]) ;
-
-    return valueSet.asValueProvider() ;
-  }
-
-  Map<String,bool> getCollectionColumns(List<Map> list) {
-    // ignore: omit_local_variable_types
-    Map<String,bool> columns = {} ;
-    list.forEach( (e) => extractColumns(e,columns) ) ;
-    return columns ;
-  }
-
-  void extractColumns(Map map, Map<String,bool> columns) {
-    if (map == null) return ;
-    map.entries.forEach( (entry) {
-      var key = entry.key ;
-      var val = entry.value ;
-
-      var containsValue = val != null || ( columns[key] ?? false ) ;
-      return columns[key] = containsValue ;
-    } ) ;
-  }
-
-}
-

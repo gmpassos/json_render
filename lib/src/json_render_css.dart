@@ -1,7 +1,6 @@
 
 import 'package:dom_tools/dom_tools.dart';
 
-////////////////////////////////////////////////////////////////////////////////
 
 const JSON_RENDER_THEME_DARK = {
   'list-render': TextStyle(color: StyleColor.fromHex('808080'), backgroundColor: StyleColor.fromRGBa('0,0,0, 0.07') , borderRadius: '10px', padding: '4px' ),

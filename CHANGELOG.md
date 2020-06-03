@@ -1,3 +1,11 @@
+## 1.3.0
+
+- Removes dependency `chartjs`.
+- Now using package `chart_engine` for Charts.
+- Hidden nodes.
+- TypeSelectRender, TypeMapper, TypeGeolocationRender.
+- Added API Documentation.
+
 ## 1.2.8
 
 - TypeEmailRender

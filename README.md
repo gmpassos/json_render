@@ -1,6 +1,20 @@
 # json_render
 
+[![pub package](https://img.shields.io/pub/v/json_render.svg?logo=dart&logoColor=00b9fc)](https://pub.dartlang.org/packages/json_render)
+[![CI](https://img.shields.io/github/workflow/status/gmpassos/json_render/Dart%20CI/master?logo=github-actions&logoColor=white)](https://github.com/gmpassos/json_render/actions)
+[![GitHub Tag](https://img.shields.io/github/v/tag/gmpassos/json_render?logo=git&logoColor=white)](https://github.com/gmpassos/json_render/releases)
+[![New Commits](https://img.shields.io/github/commits-since/gmpassos/json_render/latest?logo=git&logoColor=white)](https://github.com/gmpassos/json_render/network)
+[![Last Commits](https://img.shields.io/github/last-commit/gmpassos/json_render?logo=git&logoColor=white)](https://github.com/gmpassos/json_render/commits/master)
+[![Pull Requests](https://img.shields.io/github/issues-pr/gmpassos/json_render?logo=github&logoColor=white)](https://github.com/gmpassos/json_render/pulls)
+[![Code size](https://img.shields.io/github/languages/code-size/gmpassos/json_render?logo=github&logoColor=white)](https://github.com/gmpassos/json_render)
+[![License](https://img.shields.io/github/license/gmpassos/json_render?logo=open-source-initiative&logoColor=green)](https://github.com/gmpassos/json_render/blob/master/LICENSE)
+[![Funding](https://img.shields.io/badge/Donate-yellow?labelColor=666666&style=plastic&logo=liberapay)](https://liberapay.com/gmpassos/donate)
+[![Funding](https://img.shields.io/liberapay/patrons/gmpassos.svg?logo=liberapay)](https://liberapay.com/gmpassos/donate)
+
+
 JSON Web Render Framework
+
+Automatically renders a JSON using rich components.
 
 ## Usage
 

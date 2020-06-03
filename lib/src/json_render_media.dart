@@ -9,8 +9,10 @@ import 'package:swiss_knife/swiss_knife.dart';
 
 import 'json_render_base.dart';
 
+
 TrackElementInViewport _TRACK_ELEMENTS_IN_VIEWPORT = TrackElementInViewport() ;
 
+/// Base class to render images and other types of media.
 abstract class TypeMediaRender extends TypeRender {
 
   TypeMediaRender(String cssClass) : super(cssClass);
@@ -87,8 +89,7 @@ String _randomPictureEntity() {
   return entity ;
 }
 
-////////////////////////////////////////////////////////////////////////////////
-
+/// Renders an image from an URL.
 class TypeImageURLRender extends TypeMediaRender {
 
   final FilterURL filterURL  ;
@@ -105,7 +106,7 @@ class TypeImageURLRender extends TypeMediaRender {
     if ( DataURLBase64.matches(node) ) {
       return true ;
     }
-    else if ( isHttpHURL(node) ) {
+    else if ( isHttpURL(node) ) {
       var url = node.trim() ;
       if ( node.contains('?') ) {
         url = node.split('?')[0] ;
@@ -124,6 +125,9 @@ class TypeImageURLRender extends TypeMediaRender {
   bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
     return matchesNode(node) ;
   }
+
+  String imageMaxWidth = '40vw' ;
+  String imageMaxHeight ;
 
   @override
   ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
@@ -147,9 +151,25 @@ class TypeImageURLRender extends TypeMediaRender {
     }
     else {
       elem = createImageElementFromURL(render, lazyLoad, url, urlType) ;
-      elem.style.maxWidth = '40vw';
-
       valueProvider = (parent) => nodeOriginal ;
+    }
+
+    if ( imageMaxWidth != null ) {
+      elem.style.maxWidth = imageMaxWidth ;
+    }
+
+    if ( imageMaxHeight != null ) {
+      elem.style.maxHeight = imageMaxHeight ;
+    }
+
+    if (elem is ImageElement) {
+      var img = elem ;
+
+      img.style.cursor = 'pointer' ;
+
+      img.onClick.listen((e) {
+        showDialogImage( img.src ) ;
+      });
     }
 
     output.children.add(elem) ;
@@ -161,6 +181,18 @@ class TypeImageURLRender extends TypeMediaRender {
 
 }
 
+/// Renders an Image with informations from an JSON Object.
+///
+/// Example:
+/// ```
+///   {
+///   'imageURL': 'data:...',
+///   'time': 1591170059621,
+///   'clipArea': {'x': 10, 'y': 10, 'width': 640, 'height': 480}
+///   'rectangles': [ [10,10, 20,20] , [50,10, 20,20] ]
+///   'points': [ [10,10] , [50,10] ]
+///   }
+/// ```
 class TypeImageViewerRender extends TypeMediaRender {
 
   final FilterURL filterURL  ;
@@ -220,7 +252,6 @@ class TypeImageViewerRender extends TypeMediaRender {
     return null ;
   }
 
-  /////////////////////////////////////////////////////
 
   // ignore: use_function_type_syntax_for_parameters
   ViewerValue<T> _parseViewerValue<T>(node, List<String> keys , { ViewerValue<T> constructorNull() , ViewerValue<T> constructorValue(T value) , T mapperList(List value) , T mapperMap(Map value) } ) {
@@ -256,7 +287,6 @@ class TypeImageViewerRender extends TypeMediaRender {
     return null ;
   }
 
-  ///////////////////////////////////
 
   ViewerValue< Rectangle<num> > parseClip(node) {
     return _parseViewerValue(
@@ -291,7 +321,6 @@ class TypeImageViewerRender extends TypeMediaRender {
     );
   }
 
-  //////////////////////////////////////////////
 
   @override
   bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
@@ -312,7 +341,6 @@ class TypeImageViewerRender extends TypeMediaRender {
     return false ;
   }
 
-  /////////
 
   @override
   ValueProvider render( JSONRender render, DivElement output, dynamic node, dynamic nodeOriginal, NodeKey nodeKey) {
