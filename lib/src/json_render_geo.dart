@@ -202,7 +202,7 @@ class TypeGeolocationRender extends TypeRender {
         input.value = myGeolocation.toString();
       });
 
-      geoElem = createDivInlineBlock();
+      geoElem = createDivInline();
 
       geoElem.children.add(input);
       geoElem.children.add(button);

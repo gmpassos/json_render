@@ -17,11 +17,11 @@ DivElement _createClosableContent(
     String cssClass) {
   output.style.textAlign = 'left';
 
-  var container = createDivInlineBlock();
-  var mainContent = createDivInlineBlock();
-  var subContent = createDivInlineBlock();
-  var contentWhenHidden = createDivInlineBlock();
-  var contentClipboard = createDivInlineBlock();
+  var container = createDivInline();
+  var mainContent = createDivInline();
+  var subContent = createDivInline();
+  var contentWhenHidden = createDivInline();
+  var contentClipboard = createDivInline();
 
   contentClipboard.style.width = '0px';
   contentClipboard.style.height = '0px';
@@ -102,9 +102,9 @@ DivElement _createContent(
     String cssClass) {
   output.style.textAlign = 'left';
 
-  var container = createDivInlineBlock();
-  var mainContent = createDivInlineBlock();
-  var subContent = createDivInlineBlock();
+  var container = createDivInline();
+  var mainContent = createDivInline();
+  var subContent = createDivInline();
 
   if (cssClass != null && cssClass.isNotEmpty) {
     mainContent.classes.add(cssClass);
@@ -162,7 +162,7 @@ class TypeListRender extends TypeRender {
       var elemIdx = SpanElement()
         ..innerHtml =
             simpleList ? ' &nbsp; #$i: &nbsp; ' : ' &nbsp; &nbsp; #$i: &nbsp; ';
-      var elemContent = createDivInlineBlock();
+      var elemContent = createDivInline();
 
       var elemNodeKey = nodeKey.append('$i');
 
@@ -245,7 +245,7 @@ class TypeObjectRender extends TypeRender {
         continue;
       }
 
-      var elemContent = createDivInlineBlock();
+      var elemContent = createDivInline();
       var elemValueProvider =
           render.renderNode(elemContent, entry.value, node, elemNodeKey);
 
@@ -356,7 +356,7 @@ class TypePaging extends TypeRender {
 
         var cell = row.addCell();
 
-        var elemContent = createDivInlineBlock();
+        var elemContent = createDivInline();
         var elemValueProvider =
             render.renderNode(elemContent, entry, node, entryNodeKey);
 
@@ -504,7 +504,7 @@ class TypeTableRender extends TypeRender {
 
     var columns = getCollectionColumns(render, nodeKey, list);
 
-    var contentClipboard = createDivInlineBlock()
+    var contentClipboard = createDivInline()
       ..style.width = '0px'
       ..style.height = '0px'
       ..style.display = 'none';
@@ -604,7 +604,7 @@ class TypeTableRender extends TypeRender {
               continue;
             }
 
-            var elemContent = createDivInlineBlock();
+            var elemContent = createDivInline();
             var elemValueProvider =
                 render.renderNode(elemContent, val, entry, elemNodeKey);
 

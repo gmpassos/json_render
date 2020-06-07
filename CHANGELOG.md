@@ -1,3 +1,9 @@
+## 1.3.1
+
+- dom_tools: ^1.3.1
+- chart_engine: ^1.0.11
+- dartfmt.
+
 ## 1.3.0
 
 - Removes dependency `chartjs`.

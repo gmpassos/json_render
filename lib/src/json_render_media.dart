@@ -26,7 +26,7 @@ abstract class TypeMediaRender extends TypeRender {
       JSONRender render, bool lazyLoad, String url,
       [String urlType]) {
     if (DataURLBase64.matches(urlType)) {
-      var div = createDivInlineBlock();
+      var div = createDivInline();
       var loadingElem = SpanElement()
         ..innerHtml = _randomPictureEntity()
         ..style.fontSize = '120%';
@@ -244,9 +244,9 @@ class TypeImageViewerRender extends TypeMediaRender {
   }
 
   // ignore: use_function_type_syntax_for_parameters
-  ViewerValue<T> _parseViewerValue<T>(node, List<String> keys,
-      {ViewerValue<T> Function() constructorNull,
-      ViewerValue<T> Function(T value) constructorValue,
+  ViewerElement<T> _parseViewerElement<T>(node, List<String> keys,
+      {ViewerElement<T> Function() constructorNull,
+      ViewerElement<T> Function(T value) constructorValue,
       T Function(List value) mapperList,
       T Function(Map value) mapperMap}) {
     if (node is Map) {
@@ -256,10 +256,10 @@ class TypeImageViewerRender extends TypeMediaRender {
         var entryValue = entry.value;
 
         if (entryValue == null) {
-          var viewerValue = constructorNull != null
+          var viewerElement = constructorNull != null
               ? constructorNull()
               : constructorValue(null);
-          return viewerValue..key = entry.key;
+          return viewerElement..key = entry.key;
         } else if (entryValue is List) {
           if (mapperList == null) return null;
           var value = mapperList(entryValue);
@@ -275,30 +275,30 @@ class TypeImageViewerRender extends TypeMediaRender {
     return null;
   }
 
-  ViewerValue<Rectangle<num>> parseClip(node) {
-    return _parseViewerValue(node, ['clip', 'clipArea', 'cliparea'],
-        constructorValue: CanvasImageViewer.clipViewerValue,
+  ViewerElement<Rectangle<num>> parseClip(node) {
+    return _parseViewerElement(node, ['clip', 'clipArea', 'cliparea'],
+        constructorValue: CanvasImageViewer.clipViewerElement,
         mapperList: parseRectangleFromList,
         mapperMap: parseRectangleFromMap);
   }
 
-  ViewerValue<List<Rectangle<num>>> parseRectangles(node) {
-    return _parseViewerValue(node, ['rectangles', 'rects'],
-        constructorValue: CanvasImageViewer.rectanglesViewerValue,
+  ViewerElement<List<Rectangle<num>>> parseRectangles(node) {
+    return _parseViewerElement(node, ['rectangles', 'rects'],
+        constructorValue: CanvasImageViewer.rectanglesViewerElement,
         mapperList: (list) => list.map(parseRectangle).toList());
   }
 
-  ViewerValue<List<Point<num>>> parsePoints(node) {
-    return _parseViewerValue(node, ['points'],
-        constructorValue: CanvasImageViewer.pointsViewerValue,
+  ViewerElement<List<Point<num>>> parsePoints(node) {
+    return _parseViewerElement(node, ['points'],
+        constructorValue: CanvasImageViewer.pointsViewerElement,
         mapperList: (list) => list.map(parsePoint).toList());
   }
 
-  ViewerValue<List<Point<num>>> parsePerspectiveFilter(node) {
-    return _parseViewerValue(
+  ViewerElement<List<Point<num>>> parsePerspectiveFilter(node) {
+    return _parseViewerElement(
         node, ['perspectiveFilter', 'perspectivefilter', 'perspective'],
         constructorValue: (value) =>
-            CanvasImageViewer.perspectiveViewerValue(value),
+            CanvasImageViewer.perspectiveViewerElement(value),
         mapperList: (list) => numsToPoints(parseNumsFromList(list)));
   }
 
@@ -345,7 +345,7 @@ class TypeImageViewerRender extends TypeMediaRender {
       }
     }
 
-    Element elem = createDivInlineBlock();
+    Element elem = createDivInline();
 
     var imgElemContainer =
         createImageElementFromURL(render, lazyLoad, imageURL, urlType);
@@ -380,10 +380,10 @@ class TypeImageViewerRender extends TypeMediaRender {
       dynamic node,
       Element parent,
       ImageElement imageElement,
-      ViewerValue<List<Point<num>>> perspectiveFilter,
-      ViewerValue<Rectangle<num>> clip,
-      ViewerValue<List<Rectangle<num>>> rectangles,
-      ViewerValue<List<Point<num>>> points,
+      ViewerElement<List<Point<num>>> perspectiveFilter,
+      ViewerElement<Rectangle<num>> clip,
+      ViewerElement<List<Rectangle<num>>> rectangles,
+      ViewerElement<List<Point<num>>> points,
       DateTime time,
       ValueProviderReference valueProviderRef) {
     var w = imageElement.naturalWidth;
@@ -404,7 +404,7 @@ class TypeImageViewerRender extends TypeMediaRender {
 
     var canvas = CanvasElement(width: w, height: h);
     var gridSize = editionType == EditionType.PERSPECTIVE
-        ? CanvasImageViewer.gridSizeViewerValue(0.05)
+        ? CanvasImageViewer.gridSizeViewerElement(0.05)
         : null;
 
     var canvasImageViewer = CanvasImageViewer(canvas,
