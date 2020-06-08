@@ -1,3 +1,8 @@
+## 1.3.2
+
+- Added example.
+- Better package description.
+
 ## 1.3.1
 
 - dom_tools: ^1.3.1
