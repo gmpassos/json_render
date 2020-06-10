@@ -1,3 +1,7 @@
+## 1.3.3
+
+- dom_tools: ^1.3.2
+
 ## 1.3.2
 
 - Added example.
