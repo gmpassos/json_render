@@ -1,3 +1,10 @@
+## 1.3.4
+
+- dom_tools: ^1.3.4
+- mercury_client: ^1.1.8
+- swiss_knife: ^2.5.5
+- chart_engine: ^1.1.3
+
 ## 1.3.3
 
 - dom_tools: ^1.3.2

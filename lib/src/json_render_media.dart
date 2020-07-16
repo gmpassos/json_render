@@ -407,7 +407,8 @@ class TypeImageViewerRender extends TypeMediaRender {
         ? CanvasImageViewer.gridSizeViewerElement(0.05)
         : null;
 
-    var canvasImageViewer = CanvasImageViewer(canvas,
+    var canvasImageViewer = CanvasImageViewer(
+        canvas: canvas,
         image: imageElement,
         perspective: perspectiveFilter,
         gridSize: gridSize,
