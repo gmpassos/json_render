@@ -14,10 +14,10 @@ import 'json_render_types.dart';
 /// Enum for render modes.
 enum JSONRenderMode { INPUT, VIEW }
 
-String convertToJSONAsString(dynamic jsonNode, [String ident = '  ']) {
+String convertToJSONAsString(dynamic jsonNode, [String indent = '  ']) {
   if (jsonNode == null) return null;
 
-  if (ident != null && ident.isNotEmpty) {
+  if (indent != null && indent.isNotEmpty) {
     return dart_convert.JsonEncoder.withIndent('  ').convert(jsonNode);
   } else {
     return dart_convert.json.encode(jsonNode);
@@ -194,8 +194,8 @@ class JSONRender {
   }
 
   /// Same as [buildJSON], but returns as [String].
-  String buildJSONAsString([String ident = '  ']) {
-    return convertToJSONAsString(buildJSON(), ident);
+  String buildJSONAsString([String indent = '  ']) {
+    return convertToJSONAsString(buildJSON(), indent);
   }
 
   /// Renders JSON to a new [DivElement] and returns it.

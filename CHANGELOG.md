@@ -1,3 +1,13 @@
+## 1.3.5
+
+- Fix typo.
+- dartfmt.
+- mercury_client: ^1.1.10
+- dom_tools: ^1.3.8
+- swiss_knife: ^2.5.10
+- chart_engine: ^1.1.4
+- CI: dartfmt + dartanalyzer.
+
 ## 1.3.4
 
 - dom_tools: ^1.3.4
