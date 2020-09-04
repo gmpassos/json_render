@@ -1,3 +1,11 @@
+## 1.3.6
+
+- intl: ^0.16.1
+- mercury_client: ^1.1.11
+- dom_tools: ^1.3.10
+- swiss_knife: ^2.5.12
+- chart_engine: ^1.1.6
+
 ## 1.3.5
 
 - Fix typo.
