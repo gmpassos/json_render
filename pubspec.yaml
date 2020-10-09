@@ -1,6 +1,6 @@
 name: json_render
 description: JSON Web Render Framework - Automatically renders a JSON tree using rich components.
-version: 1.3.6
+version: 1.3.7
 homepage: https://github.com/gmpassos/json_render
 
 environment:
@@ -10,9 +10,9 @@ dependencies:
   intl: ^0.16.1
   mercury_client: ^1.1.11
     #path: ../mercury_client
-  dom_tools: ^1.3.10
+  dom_tools: ^1.3.12
     #path: ../dom_tools
-  swiss_knife: ^2.5.12
+  swiss_knife: ^2.5.15
     #path: ../swiss_knife
   chart_engine: ^1.1.6
     #path: ../chart_engine

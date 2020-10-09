@@ -4,8 +4,7 @@ import 'package:swiss_knife/swiss_knife.dart';
 
 import 'json_render_base.dart';
 
-void _adjustInputWidthByValueOnKeyPress(InputElement elem,
-    [int maxWidth = 800]) {
+void _adjustInputWidthByValueOnKeyPress(InputElement elem) {
   elem.onKeyUp.listen((e) {
     _adjustInputWidthByValue(elem);
   });

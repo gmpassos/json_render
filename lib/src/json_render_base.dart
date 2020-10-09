@@ -3,6 +3,7 @@ import 'dart:html';
 
 import 'package:dom_tools/dom_tools.dart';
 import 'package:mercury_client/mercury_client.dart';
+import 'package:swiss_knife/swiss_knife.dart';
 
 import 'json_render_collection.dart';
 import 'json_render_css.dart';
@@ -18,9 +19,9 @@ String convertToJSONAsString(dynamic jsonNode, [String indent = '  ']) {
   if (jsonNode == null) return null;
 
   if (indent != null && indent.isNotEmpty) {
-    return dart_convert.JsonEncoder.withIndent('  ').convert(jsonNode);
+    return encodeJSON(jsonNode, withIndent: true);
   } else {
-    return dart_convert.json.encode(jsonNode);
+    return encodeJSON(jsonNode);
   }
 }
 
@@ -553,23 +554,6 @@ class URLFiltered {
 }
 
 typedef FilterURL = URLFiltered Function(String URL);
-
-void copyElementToClipboard(Element elem) {
-  var selection = window.getSelection();
-  var range = document.createRange();
-
-  range.selectNodeContents(elem);
-  selection.removeAllRanges();
-  selection.addRange(range);
-
-  var selectedText = selection.toString();
-
-  document.execCommand('copy');
-
-  if (selectedText != null) {
-    window.getSelection().removeAllRanges();
-  }
-}
 
 class NodeKey {
   final List<String> path;

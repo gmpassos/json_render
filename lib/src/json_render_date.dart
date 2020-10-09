@@ -1,5 +1,6 @@
 import 'dart:html';
 
+import 'package:dom_tools/dom_tools.dart' show copyElementToClipboard;
 import 'package:intl/intl.dart';
 import 'package:swiss_knife/swiss_knife.dart';
 

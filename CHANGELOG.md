@@ -1,3 +1,9 @@
+## 1.3.7
+
+- Uses `encodeJSON` of `swiss_knife`.
+- dom_tools: ^1.3.12
+- swiss_knife: ^2.5.15
+
 ## 1.3.6
 
 - intl: ^0.16.1
