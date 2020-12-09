@@ -1,3 +1,11 @@
+## 1.3.8
+
+- Fix compatibility with new version of `mercury_client`.
+- mercury_client: ^1.1.14
+- dom_tools: ^1.3.15
+- swiss_knife: ^2.5.19
+- chart_engine: ^1.1.10
+
 ## 1.3.7
 
 - Uses `encodeJSON` of `swiss_knife`.

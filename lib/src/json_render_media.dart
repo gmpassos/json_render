@@ -37,7 +37,7 @@ abstract class TypeMediaRender extends TypeRender {
       var cachedResponse = getURLCached(render, url);
 
       if (cachedResponse != null && cachedResponse.isOK) {
-        imgElem.src = '${urlType}${cachedResponse.body}';
+        imgElem.src = '${urlType}${cachedResponse.bodyAsString}';
         return imgElem;
       }
 
@@ -66,7 +66,7 @@ abstract class TypeMediaRender extends TypeRender {
       String urlType, Element loadingElement) {
     getURL(render, url).then((response) {
       if (response.isOK) {
-        imgElem.src = '${urlType}${response.body}';
+        imgElem.src = '${urlType}${response.bodyAsString}';
         if (loadingElement != null) loadingElement.remove();
       }
     });
