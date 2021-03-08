@@ -27,7 +27,7 @@ DivElement _createClosableContent(
   contentClipboard.style.height = '0px';
   contentClipboard.style.lineHeight = '0px';
 
-  if (cssClass != null && cssClass.isNotEmpty) {
+  if (cssClass.isNotEmpty) {
     mainContent.classes.add(cssClass);
     contentWhenHidden.classes.add(cssClass);
   }
@@ -61,7 +61,7 @@ DivElement _createClosableContent(
     print('-------------------------------------------------');
     print(jsonStr);
 
-    contentClipboard.innerHtml = '<pre>${jsonStr}</pre>';
+    contentClipboard.innerHtml = '<pre>$jsonStr</pre>';
     copyElementToClipboard(contentClipboard);
     contentClipboard.text = '';
   });
@@ -106,7 +106,7 @@ DivElement _createContent(
   var mainContent = createDivInline();
   var subContent = createDivInline();
 
-  if (cssClass != null && cssClass.isNotEmpty) {
+  if (cssClass.isNotEmpty) {
     mainContent.classes.add(cssClass);
   }
 
@@ -147,7 +147,7 @@ class TypeListRender extends TypeRender {
   @override
   ValueProvider render(JSONRender render, DivElement output, dynamic node,
       dynamic nodeOriginal, NodeKey nodeKey) {
-    var list = (node as List) ?? [];
+    var list = node as List;
 
     var simpleList = isSimpleList(list, 8, 10);
 
@@ -220,7 +220,7 @@ class TypeObjectRender extends TypeRender {
   @override
   ValueProvider render(JSONRender render, DivElement output, dynamic node,
       dynamic nodeOriginal, NodeKey nodeKey) {
-    var obj = (node as Map) ?? {};
+    var obj = node as Map;
 
     var simpleObj = isSimpleObject(obj, 5, 10);
 
@@ -315,7 +315,7 @@ class TypePaging extends TypeRender {
   @override
   ValueProvider render(JSONRender render, DivElement output, node, nodeOriginal,
       NodeKey nodeKey) {
-    var paging = JSONPaging.from(node);
+    var paging = JSONPaging.from(node)!;
 
     var needsPaging = paging.needsPaging;
 
@@ -442,17 +442,9 @@ class TypePaging extends TypeRender {
 
 /// Renders a Table of data.
 class TypeTableRender extends TypeRender {
-  bool _ignoreNullColumns;
+  bool ignoreNullColumns;
 
-  TypeTableRender([bool ignoreNullColumns = true]) : super('table-render') {
-    this.ignoreNullColumns = ignoreNullColumns;
-  }
-
-  bool get ignoreNullColumns => _ignoreNullColumns;
-
-  set ignoreNullColumns(bool value) {
-    _ignoreNullColumns = value ?? false;
-  }
+  TypeTableRender([this.ignoreNullColumns = true]) : super('table-render');
 
   final Set<String> _ignoredColumns = {};
 
@@ -464,12 +456,9 @@ class TypeTableRender extends TypeRender {
     return list;
   }
 
-  bool ignoreColumn(String column, [bool ignore]) {
-    if (column == null) return false;
+  bool ignoreColumn(String column, [bool ignore = true]) {
     column = column.trim();
     if (column.isEmpty) return false;
-
-    ignore ??= true;
 
     if (ignore) {
       _ignoredColumns.add(column);
@@ -481,7 +470,7 @@ class TypeTableRender extends TypeRender {
   }
 
   bool isIgnoredColumn(String column) {
-    if (column == null || _ignoredColumns.isEmpty) return false;
+    if (_ignoredColumns.isEmpty) return false;
     return _ignoredColumns.contains(column);
   }
 
@@ -497,8 +486,7 @@ class TypeTableRender extends TypeRender {
   @override
   ValueProvider render(JSONRender render, DivElement output, dynamic node,
       dynamic nodeOriginal, NodeKey nodeKey) {
-    // ignore: omit_local_variable_types
-    List<Map> list = (node as List).cast() ?? [];
+    var list = (node as List).cast<Map>().toList();
 
     var valueSet = JSONValueSet(true);
 
@@ -529,7 +517,7 @@ class TypeTableRender extends TypeRender {
 
         contentClipboard.style.display = null;
 
-        contentClipboard.innerHtml = '<pre>${jsonStr}</pre>';
+        contentClipboard.innerHtml = '<pre>$jsonStr</pre>';
         copyElementToClipboard(contentClipboard);
         contentClipboard.text = '';
 
@@ -648,8 +636,6 @@ class TypeTableRender extends TypeRender {
 
   void extractColumns(JSONRender render, Map map, NodeKey entryNodeKey,
       Map<String, bool> columns) {
-    if (map == null) return;
-
     map.entries.forEach((entry) {
       var key = entry.key;
       var val = entry.value;

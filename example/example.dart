@@ -15,9 +15,9 @@ void main() {
     // Renders URL string as links.
     ..addTypeRender(TypeURLRender());
 
-  var divOutput = querySelector('#output');
+  var divOutput = querySelector('#output')!;
 
-  jsonRender.renderToDiv(divOutput);
+  jsonRender.renderToDiv(divOutput as DivElement);
 
   divOutput.onClick.listen((e) {
     // Generates JSON from rendered elements in input mode and print to console:

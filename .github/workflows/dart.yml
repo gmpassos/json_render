@@ -16,11 +16,28 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-      - name: Install dependencies
-        run: pub get
-      - name: dartfmt
-        run: dartfmt -n --set-exit-if-changed .
-      - name: dartanalyzer
-        run: dartanalyzer --fatal-infos --fatal-warnings .
-      - name: Run tests
-        run: pub run test
+      - name: APT update
+        run: apt-get update
+      - name: Install Firefox
+        run: apt-get install -y firefox-esr xorg
+      - name: Current DIR
+        run: pwd && pwd >/tmp/test-dir.txt
+      - name: Add user tester
+        run: adduser --disabled-password tester
+      - name: Clean Project + chown tester
+        run: |
+          rm -rf .dart_tool .packages pubspec.lock
+          chown -R tester:tester .
+          ls -al
+      - name: Dart version
+        run: dart --version
+      - name: dart pub get
+        run: su -c 'cd $(< /tmp/test-dir.txt) && dart pub get' tester
+      - name: dart format
+        run: su -c 'cd $(< /tmp/test-dir.txt) && dart format -o none --set-exit-if-changed .' tester
+      #- name: dart analyze
+      #  run: su -c 'cd $(< /tmp/test-dir.txt) && dart analyze --fatal-infos --fatal-warnings .' tester
+      - name: Run Browser tests (Firefox)
+        run: su -c 'DISPLAY=:0 cd $(< /tmp/test-dir.txt) && dart test -p firefox' tester
+      - name: publish --dry-run
+        run: su -c 'DISPLAY=:0 cd $(< /tmp/test-dir.txt) && dart pub publish --dry-run' tester

@@ -15,19 +15,18 @@ import 'json_render_types.dart';
 /// Enum for render modes.
 enum JSONRenderMode { INPUT, VIEW }
 
-String convertToJSONAsString(dynamic jsonNode, [String indent = '  ']) {
+String? convertToJSONAsString(dynamic jsonNode, [String indent = '  ']) {
   if (jsonNode == null) return null;
 
-  if (indent != null && indent.isNotEmpty) {
+  if (indent.isNotEmpty) {
     return encodeJSON(jsonNode, withIndent: true);
   } else {
     return encodeJSON(jsonNode);
   }
 }
 
-dynamic normalizeJSONValuePrimitive(dynamic value, [bool forceString]) {
+dynamic normalizeJSONValuePrimitive(dynamic value, [bool forceString = false]) {
   if (value == null) return null;
-  forceString ??= false;
 
   if (value is String) {
     if (forceString) return value;
@@ -46,7 +45,7 @@ dynamic normalizeJSONValuePrimitive(dynamic value, [bool forceString]) {
   return value;
 }
 
-num normalizeJSONValueNumber(dynamic value) {
+num? normalizeJSONValueNumber(dynamic value) {
   if (value == null) return null;
 
   if (value is num) return value;
@@ -62,20 +61,14 @@ typedef ValueProvider = dynamic Function(dynamic parent);
 ValueProvider VALUE_PROVIDER_NULL = (parent) => null;
 
 class ValueProviderReference {
-  ValueProvider _valueProvider;
+  ValueProvider valueProvider;
 
-  ValueProviderReference(this._valueProvider);
+  ValueProviderReference(this.valueProvider);
 
-  ValueProvider get valueProvider => _valueProvider;
-
-  set valueProvider(ValueProvider value) {
-    _valueProvider = value;
-  }
-
-  dynamic call(dynamic parent) => _valueProvider(parent);
+  dynamic call(dynamic parent) => valueProvider(parent);
 
   ValueProvider asValueProvider() {
-    return (parent) => _valueProvider(parent);
+    return (parent) => valueProvider(parent);
   }
 }
 
@@ -86,13 +79,11 @@ class JSONValueSet {
 
   final Map<NodeKey, ValueProvider> values = {};
 
-  void put(NodeKey key, ValueProvider val) {
-    if (key != null) {
-      values[key] = val ?? VALUE_PROVIDER_NULL;
-    }
+  void put(NodeKey key, ValueProvider? val) {
+    values[key] = val ?? VALUE_PROVIDER_NULL;
   }
 
-  String buildJSONAsString(dynamic parent) {
+  String? buildJSONAsString(dynamic parent) {
     return convertToJSONAsString(buildJSON(parent));
   }
 
@@ -135,8 +126,6 @@ class JSONValueSet {
   }
 
   dynamic _callValueProvider(ValueProvider valueProvider, dynamic parent) {
-    if (valueProvider == null) return null;
-
     var value = valueProvider(parent);
     return value;
   }
@@ -149,7 +138,7 @@ class JSONValueSet {
 /// The JSON Render.
 class JSONRender {
   /// The JSON root node to render.
-  dynamic _json;
+  Object? _json;
 
   JSONRender.fromJSON(this._json);
 
@@ -159,43 +148,35 @@ class JSONRender {
 
   dynamic get json {
     if (_json == null) return null;
-    if (_json is Map) return Map.unmodifiable(_json);
-    if (_json is List) return List.unmodifiable(_json);
+    if (_json is Map) return Map.unmodifiable(_json as Map<dynamic, dynamic>);
+    if (_json is List) return List.unmodifiable(_json as Iterable<dynamic>);
     return _json;
   }
 
-  Map get jsonObject => json as Map;
+  Map? get jsonObject => json as Map?;
 
-  List get jsonList => json as List;
+  List? get jsonList => json as List?;
 
-  num get jsonNumber => _json is String ? _json : '$_json';
+  num? get jsonNumber => parseNum(_json);
 
-  bool get jsonBoolean =>
-      _json is bool ? _json : '$_json'.trim().toLowerCase() == 'true';
+  bool? get jsonBoolean => parseBool(_json);
 
   String get jsonString => '$_json';
 
-  JSONRenderMode _renderMode = JSONRenderMode.VIEW;
-
-  JSONRenderMode get renderMode => _renderMode;
-
   /// Returns [true] if this is in input mode: [JSONRenderMode.INPUT]
-  bool get isInputRenderMode => _renderMode == JSONRenderMode.INPUT;
+  JSONRenderMode renderMode = JSONRenderMode.VIEW;
 
-  set renderMode(JSONRenderMode value) {
-    if (value == null) return;
-    _renderMode = value;
-  }
+  bool get isInputRenderMode => renderMode == JSONRenderMode.INPUT;
 
   /// Rebuilds JSON from current rendered tree. If in [JSONRenderMode.INPUT]
   /// it will update tree values.
   dynamic buildJSON() {
     if (_treeValueProvider == null) return null;
-    return _treeValueProvider(null);
+    return _treeValueProvider!(null);
   }
 
   /// Same as [buildJSON], but returns as [String].
-  String buildJSONAsString([String indent = '  ']) {
+  String? buildJSONAsString([String indent = '  ']) {
     return convertToJSONAsString(buildJSON(), indent);
   }
 
@@ -206,7 +187,7 @@ class JSONRender {
     return output;
   }
 
-  ValueProvider _treeValueProvider;
+  ValueProvider? _treeValueProvider;
 
   /// Renders JSON to div [output].
   void renderToDiv(DivElement output) {
@@ -223,7 +204,7 @@ class JSONRender {
     }
   }
 
-  ValueProvider renderNode(
+  ValueProvider? renderNode(
       DivElement output, dynamic node, dynamic parent, NodeKey nodeKey) {
     output.style.display = 'inline-block';
 
@@ -324,10 +305,8 @@ class JSONRender {
   ///
   /// [overwrite] If true substitutes current render of same type.
   bool addTypeRender(TypeRender typeRender, [bool overwrite = false]) {
-    if (typeRender == null) return false;
-
     if (_extendedTypeRenders.contains(typeRender)) {
-      if (overwrite ?? false) {
+      if (overwrite) {
         _extendedTypeRenders.remove(typeRender);
       } else {
         return false;
@@ -360,12 +339,11 @@ class JSONRender {
 
   /// Removes a [typeRender] from capable render list.
   bool removeTypeRender(TypeRender typeRender) {
-    if (typeRender == null) return false;
     return _extendedTypeRenders.remove(typeRender);
   }
 
   /// Gets a [TypeRender] by [type] from capable render list.
-  TypeRender getTypeRender(Type type) {
+  TypeRender? getTypeRender(Type type) {
     for (var typeRender in _extendedTypeRenders) {
       var runtimeType = typeRender.runtimeType;
       if (runtimeType == type) {
@@ -383,37 +361,19 @@ class JSONRender {
   }
 
   /// If [true] will ignore [null] nodes and ignore them to render.
-  bool _ignoreNullNodes = false;
-
-  bool get ignoreNullNodes => _ignoreNullNodes;
-
-  set ignoreNullNodes(bool value) {
-    _ignoreNullNodes = value ?? false;
-  }
+  bool ignoreNullNodes = false;
 
   /// If [true] shows an arrow for each node entry.
-  bool _showNodeArrow = true;
-
-  bool get showNodeArrow => _showNodeArrow;
-
-  set showNodeArrow(bool value) {
-    _showNodeArrow = value ?? true;
-  }
+  bool showNodeArrow = true;
 
   /// If [true] renders an opener `{` and closer `}` characters for each node.
-  bool _showNodeOpenerAndCloser = true;
-
-  bool get showNodeOpenerAndCloser => _showNodeOpenerAndCloser;
-
-  set showNodeOpenerAndCloser(bool value) {
-    _showNodeOpenerAndCloser = value ?? true;
-  }
+  bool showNodeOpenerAndCloser = true;
 
   final List<NodeValidator> _nodeValidators = [];
 
   /// Adds a node [validator]. Invalid nodes are ignored.
   bool addNodeValidator(NodeValidator validator) {
-    if (validator == null || _nodeValidators.contains(validator)) return false;
+    if (_nodeValidators.contains(validator)) return false;
     _nodeValidators.add(validator);
     return true;
   }
@@ -425,7 +385,6 @@ class JSONRender {
 
   /// Removes a node [validator].
   bool removeNodeValidator(NodeValidator validator) {
-    if (validator == null) return false;
     return _nodeValidators.remove(validator);
   }
 
@@ -434,7 +393,7 @@ class JSONRender {
   /// Adds a [typeMapper]. A [TypeMapper] is able to convert a node to another
   /// structure, allowing to match different types from original behavior.
   bool addTypeMapper(TypeMapper typeMapper) {
-    if (typeMapper == null || _typeMappers.contains(typeMapper)) return false;
+    if (_typeMappers.contains(typeMapper)) return false;
     _typeMappers.add(typeMapper);
     return true;
   }
@@ -444,14 +403,13 @@ class JSONRender {
   }
 
   bool removeTypeMapper(TypeMapper typeMapper) {
-    if (typeMapper == null) return false;
     return _typeMappers.remove(typeMapper);
   }
 
   final Set<Pattern> _hiddenNodes = {};
 
   bool addHiddenNode(Pattern hiddenNodePattern) {
-    if (hiddenNodePattern == null || _hiddenNodes.contains(hiddenNodePattern)) {
+    if (_hiddenNodes.contains(hiddenNodePattern)) {
       return false;
     }
     _hiddenNodes.add(hiddenNodePattern);
@@ -463,17 +421,16 @@ class JSONRender {
   }
 
   bool removeHiddenNode(Pattern hiddenNodePattern) {
-    if (hiddenNodePattern == null) return false;
     return _hiddenNodes.remove(hiddenNodePattern);
   }
 
   bool isHiddenNode(NodeKey nodeKey) {
-    if (nodeKey == null || _hiddenNodes.isEmpty) return false;
+    if (_hiddenNodes.isEmpty) return false;
     return isHiddenNodePath(nodeKey.toString());
   }
 
   bool isHiddenNodePath(String nodePath) {
-    if (nodePath == null || _hiddenNodes.isEmpty) return false;
+    if (_hiddenNodes.isEmpty) return false;
 
     for (var pattern in _hiddenNodes) {
       if (pattern is RegExp) {
@@ -482,7 +439,7 @@ class JSONRender {
         if (pattern == nodePath) return true;
       } else {
         var allMatches = pattern.allMatches(nodePath);
-        if (allMatches != null && allMatches.isNotEmpty) return true;
+        if (allMatches.isNotEmpty) return true;
       }
     }
 
@@ -492,7 +449,7 @@ class JSONRender {
   final List<TypeAction> _typeActions = [];
 
   bool addTypeAction(TypeAction typeAction) {
-    if (typeAction == null || _typeActions.contains(typeAction)) return false;
+    if (_typeActions.contains(typeAction)) return false;
     _typeActions.add(typeAction);
     return true;
   }
@@ -502,47 +459,36 @@ class JSONRender {
   }
 
   bool removeTypeAction(TypeAction typeAction) {
+    // ignore: unnecessary_null_comparison
     if (typeAction == null) return false;
     return _typeActions.remove(typeAction);
   }
 
-  CSSThemeSet _cssThemeSet = JSON_RENDER_DEFAULT_THEME_SET;
+  CSSThemeSet cssThemeSet = JSON_RENDER_DEFAULT_THEME_SET;
 
-  CSSThemeSet get cssThemeSet => _cssThemeSet;
-
-  set cssThemeSet(CSSThemeSet value) {
-    _cssThemeSet = value ?? JSON_RENDER_DEFAULT_THEME_SET;
-  }
-
-  String get cssThemePrefix => _cssThemeSet.cssPrefix;
+  String get cssThemePrefix => cssThemeSet.cssPrefix;
 
   void applyCSS(TypeRender typeRender, Element output,
-      [List<Element> extraElements]) {
-    _cssThemeSet.ensureThemeLoaded();
+      [List<Element>? extraElements]) {
+    cssThemeSet.ensureThemeLoaded();
   }
 
   static final HttpCache DEFAULT_HTTP_CACHE = HttpCache(
       maxCacheMemory: 1024 * 1024 * 16, timeout: Duration(minutes: 5));
 
-  HttpCache _httpCache = DEFAULT_HTTP_CACHE;
-
-  HttpCache get httpCache => _httpCache;
-
-  set httpCache(HttpCache value) {
-    _httpCache = value ?? DEFAULT_HTTP_CACHE;
-  }
+  HttpCache httpCache = DEFAULT_HTTP_CACHE;
 }
 
 class URLFiltered {
   final String url;
 
-  final String target;
+  final String? target;
 
-  final String _label;
+  final String? _label;
 
-  final String type;
+  final String? type;
 
-  URLFiltered(this.url, {this.target, String label, this.type})
+  URLFiltered(this.url, {this.target, String? label, this.type})
       : _label = label;
 
   String get label => _label ?? url;
@@ -553,7 +499,7 @@ class URLFiltered {
   }
 }
 
-typedef FilterURL = URLFiltered Function(String URL);
+typedef FilterURL = URLFiltered Function(String? URL);
 
 class NodeKey {
   final List<String> path;
@@ -563,7 +509,7 @@ class NodeKey {
             fullKey.trim().split('/').map((e) => e.trim()).toList(),
             growable: false);
 
-  NodeKey([List<String> path])
+  NodeKey([List<String>? path])
       : path = List.from(path ?? [''], growable: false);
 
   NodeKey append(String appendKey) => NodeKey([...path, appendKey]);
@@ -576,19 +522,19 @@ class NodeKey {
 
   String get rootKey => path[0];
 
-  String get parentKey => path.length > 1 ? path[path.length - 2] : null;
+  String? get parentKey => path.length > 1 ? path[path.length - 2] : null;
 
   String get leafKey => path[path.length - 1];
 
-  NodeKey get parent =>
+  NodeKey? get parent =>
       path.length > 1 ? NodeKey(List.from(path)..removeLast()) : null;
 
-  String _pathString;
+  String? _pathString;
 
   @override
   String toString() {
     _pathString ??= path.join('/');
-    return _pathString;
+    return _pathString!;
   }
 
   @override
@@ -607,7 +553,7 @@ abstract class TypeRender {
   final String cssClass;
 
   TypeRender(this.cssClass) {
-    if (cssClass == null || cssClass.isEmpty) {
+    if (cssClass.isEmpty) {
       throw ArgumentError('Invalid cssClass');
     }
   }
@@ -618,7 +564,7 @@ abstract class TypeRender {
       dynamic nodeOriginal, NodeKey nodeKey);
 
   void applyCSS(JSONRender render, Element output,
-      {String cssClass, List<Element> extraElements}) {
+      {String? cssClass, List<Element>? extraElements}) {
     if (cssClass == null || cssClass.isEmpty) {
       cssClass = this.cssClass;
     }
@@ -643,7 +589,7 @@ abstract class TypeRender {
 }
 
 class _NodeMapping {
-  final TypeMapper typeMapper;
+  final TypeMapper? typeMapper;
 
   final dynamic nodeOriginal;
 
@@ -658,7 +604,7 @@ class _NodeMapping {
 
   dynamic unmap(dynamic node, dynamic nodeParent) {
     if (typeMapper != null) {
-      return typeMapper.unmap(node, nodeOriginal, nodeParent, nodeKey);
+      return typeMapper!.unmap(node, nodeOriginal, nodeParent, nodeKey);
     } else {
       return node;
     }
@@ -690,12 +636,12 @@ class TypeMapper {
   ///
   /// Needed to update the generated JSON
   /// with tree inputs.
-  final NodeUnmap unmapper;
+  final NodeUnmap? unmapper;
 
-  factory TypeMapper.from(dynamic matcher, dynamic mapper, [dynamic unmapper]) {
-    NodeMatcher matcherOk;
-    NodeMap mapperOk;
-    NodeUnmap unmapperOk;
+  static TypeMapper? from(dynamic matcher, dynamic mapper, [dynamic unmapper]) {
+    NodeMatcher? matcherOk;
+    NodeMap? mapperOk;
+    NodeUnmap? unmapperOk;
 
     if (matcher is NodeMatcher) {
       matcherOk = matcher;
@@ -733,7 +679,7 @@ class TypeMapper {
   dynamic unmap(
       dynamic node, dynamic nodeOriginal, dynamic parent, NodeKey nodeKey) {
     if (unmapper != null) {
-      return unmapper(node, nodeOriginal, parent, nodeKey);
+      return unmapper!(node, nodeOriginal, parent, nodeKey);
     } else {
       return node;
     }
@@ -752,10 +698,7 @@ class TypeAction {
 
   final NodeAction action;
 
-  TypeAction(this.matcher, this.action) {
-    if (matcher == null) throw ArgumentError.notNull('matcher');
-    if (action == null) throw ArgumentError.notNull('action');
-  }
+  TypeAction(this.matcher, this.action);
 
   bool matches(dynamic node, dynamic parent, NodeKey nodeKey) =>
       matcher(node, parent, nodeKey);

@@ -52,7 +52,7 @@ class TypeDateRender extends TypeRender {
         ..type = 'datetime-local';
 
       valueProvider = (parent) {
-        var time = DateTime.parse((elem as InputElement).value);
+        var time = DateTime.parse((elem as InputElement).value!);
         var dateTimeStr = showHour
             ? DATE_FORMAT_YYYY_MM_DD_HH_MM_SS.format(time)
             : DATE_FORMAT_YYYY_MM_DD.format(time);
@@ -84,8 +84,8 @@ class TypeDateRender extends TypeRender {
 class TypeUnixEpochRender extends TypeRender {
   final bool inMilliseconds;
 
-  TypeUnixEpochRender([bool inMilliseconds])
-      : inMilliseconds = inMilliseconds ?? true,
+  TypeUnixEpochRender([bool inMilliseconds = true])
+      : inMilliseconds = inMilliseconds,
         super('unix-epoch-render');
 
   bool get inSeconds => !inMilliseconds;
@@ -94,9 +94,7 @@ class TypeUnixEpochRender extends TypeRender {
     return isNumInUnixEpochRange(val, inMilliseconds);
   }
 
-  static bool isNumInUnixEpochRange(num val, [bool inMilliseconds]) {
-    inMilliseconds ??= true;
-
+  static bool isNumInUnixEpochRange(num val, [bool inMilliseconds = true]) {
     if (inMilliseconds) {
       return val > 946692000000 && val < 32503690800000;
     } else {
@@ -104,7 +102,7 @@ class TypeUnixEpochRender extends TypeRender {
     }
   }
 
-  int parseUnixEpoch(node) {
+  int? parseUnixEpoch(node) {
     if (node is num) {
       return isValueUnixEpochRange(node) ? node.toInt() : null;
     } else if (node is String) {
@@ -130,7 +128,7 @@ class TypeUnixEpochRender extends TypeRender {
         alreadyInMilliseconds ? unixEpoch : unixEpoch * 1000);
   }
 
-  int toUnixEpoch(String value) {
+  int? toUnixEpoch(String? value) {
     if (value == null) return null;
     value = value.trim();
     if (value.isEmpty) return null;
@@ -143,7 +141,7 @@ class TypeUnixEpochRender extends TypeRender {
   @override
   ValueProvider render(JSONRender render, DivElement output, dynamic node,
       dynamic nodeOriginal, NodeKey nodeKey) {
-    var unixEpoch = parseUnixEpoch(node);
+    var unixEpoch = parseUnixEpoch(node)!;
     var dateTime = toDateTime(unixEpoch, true).toLocal();
 
     Element elem;
@@ -156,7 +154,7 @@ class TypeUnixEpochRender extends TypeRender {
         ..value = dateTimeLocal
         ..type = 'datetime-local';
       valueProvider = (parent) {
-        var time = toUnixEpoch((elem as InputElement).value);
+        var time = toUnixEpoch((elem as InputElement).value)!;
 
         var timeDiff = unixEpoch - time;
         if (timeDiff > 0 && timeDiff <= 1000) {
@@ -196,15 +194,15 @@ class TypeUnixEpochRender extends TypeRender {
 class TypeTimeRender extends TypeRender {
   final bool inMilliseconds;
 
-  final List<String> _allowedKeys;
+  final List<String>? _allowedKeys;
 
-  TypeTimeRender([bool inMilliseconds, this._allowedKeys])
-      : inMilliseconds = inMilliseconds ?? true,
+  TypeTimeRender([bool inMilliseconds = true, this._allowedKeys])
+      : inMilliseconds = inMilliseconds,
         super('time-render');
 
   bool get inSeconds => !inMilliseconds;
 
-  List<String> get allowedKeys => List.from(_allowedKeys).cast();
+  List<String> get allowedKeys => List.from(_allowedKeys!).cast();
 
   bool isTimeInRange(num val) {
     if (inMilliseconds) {
@@ -214,7 +212,7 @@ class TypeTimeRender extends TypeRender {
     }
   }
 
-  int parseTime(node) {
+  int? parseTime(node) {
     if (node is num) {
       return isTimeInRange(node) ? node.toInt() : null;
     } else if (node is String) {
@@ -235,7 +233,7 @@ class TypeTimeRender extends TypeRender {
   }
 
   bool _isAllowedKey(NodeKey nodeKey) {
-    if (allowedKeys == null || allowedKeys.isEmpty) return false;
+    if (allowedKeys.isEmpty) return false;
 
     var leafKey = nodeKey.leafKey.toLowerCase();
 
@@ -249,7 +247,7 @@ class TypeTimeRender extends TypeRender {
   @override
   ValueProvider render(JSONRender render, DivElement output, dynamic node,
       dynamic nodeOriginal, NodeKey nodeKey) {
-    var time = parseTime(node);
+    var time = parseTime(node)!;
     var timeOriginal = inMilliseconds ? time : time / 1000;
 
     Element elem;

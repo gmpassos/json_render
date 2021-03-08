@@ -10,23 +10,20 @@ class Geolocation {
   static Future<Geolocation> getCurrentGeolocation() async {
     print('Geolocation.getCurrentGeolocation> ...');
     var geolocation = window.navigator.geolocation;
-    if (geolocation == null) return null;
     var currentPosition = await geolocation.getCurrentPosition(
         enableHighAccuracy: true,
         timeout: Duration(seconds: 30),
         maximumAge: Duration(minutes: 10));
     print('Geolocation.getCurrentGeolocation> $currentPosition');
-    var coords = currentPosition.coords;
-    return Geolocation(coords.latitude, coords.longitude);
+    var coords = currentPosition.coords!;
+    return Geolocation(coords.latitude!, coords.longitude!);
   }
 
   static final RegExp GEOLOCATION_FORMAT =
       RegExp(r'([-=]?)(\d+[,.]?\d*)\s*[°o]?\s*(\w)');
 
-  static num parseLatitudeOrLongitudeValue(String s,
+  static num? parseLatitudeOrLongitudeValue(String s,
       [bool onlyWithCardinals = false]) {
-    onlyWithCardinals ??= false;
-
     var match = GEOLOCATION_FORMAT.firstMatch(s);
     if (match == null) return null;
 
@@ -53,7 +50,7 @@ class Geolocation {
     }
 
     if (onlyWithCardinals) return null;
-    return double.parse(number);
+    return double.parse(number!);
   }
 
   static String formatLatitude(num lat) {
@@ -69,34 +66,26 @@ class Geolocation {
   }
 
   /// The latitude of the coordinate.
-  num _latitude;
+  final num latitude;
 
   /// The longitude of the coordinate.
-  num _longitude;
+  final num longitude;
 
-  Geolocation(this._latitude, this._longitude) {
-    if (_latitude == null || _longitude == null) {
-      throw ArgumentError('Invalid coords: $_latitude $longitude');
-    }
-  }
+  Geolocation(this.latitude, this.longitude);
 
-  factory Geolocation.fromCoords(String coords, [bool onlyWithCardinals]) {
+  static Geolocation? fromCoords(String coords, [bool? onlyWithCardinals]) {
     coords = coords.trim();
 
     var parts = coords.split(RegExp(r'\s+'));
     if (parts.length < 2) return null;
 
-    var lat = parseLatitudeOrLongitudeValue(parts[0], onlyWithCardinals);
+    var lat = parseLatitudeOrLongitudeValue(parts[0], onlyWithCardinals!);
     var long = parseLatitudeOrLongitudeValue(parts[1], onlyWithCardinals);
 
     return lat != null && long != null ? Geolocation(lat, long) : null;
   }
 
-  num get latitude => _latitude;
-
-  num get longitude => _longitude;
-
-  Point<num> asPoint() => Point(_latitude, _longitude);
+  Point<num> asPoint() => Point(latitude, longitude);
 
   @override
   String toString() {
@@ -104,22 +93,23 @@ class Geolocation {
   }
 
   String windowID(String prefix) {
-    return '${prefix}__${latitude}__${longitude}';
+    return '${prefix}__${latitude}__$longitude';
   }
 
   String googleMapsURL() {
-    return 'https://www.google.com/maps/search/?api=1&query=$_latitude,$longitude';
+    return 'https://www.google.com/maps/search/?api=1&query=$latitude,$longitude';
   }
 
   Future<String> googleMapsDirectionsURL() async {
     var currentGeo = await getCurrentGeolocation();
-    if (currentGeo == null) return null;
-    return 'https://www.google.com/maps/dir/?api=1&origin=${currentGeo.latitude},${currentGeo.longitude}&destination=$_latitude,$longitude';
+
+    return 'https://www.google.com/maps/dir/?api=1&origin=${currentGeo.latitude},${currentGeo.longitude}&destination=$latitude,$longitude';
   }
 
   String openGoogleMaps() {
     var url = googleMapsURL();
     print('Geolocation.openGoogleMaps> $url');
+    // ignore: unsafe_html
     window.open(url, windowID('googlemaps'));
     return url;
   }
@@ -128,6 +118,7 @@ class Geolocation {
     print('Geolocation.openGoogleMapsDirections> ...');
     var url = await googleMapsDirectionsURL();
     print('Geolocation.openGoogleMapsDirections> $url');
+    // ignore: unsafe_html
     window.open(url, windowID('googlemaps_directions'));
     return url;
   }
@@ -145,7 +136,7 @@ class TypeGeolocationRender extends TypeRender {
     return parseLatitudeLongitude(node) != null;
   }
 
-  Geolocation parseLatitudeLongitude(dynamic node) {
+  Geolocation? parseLatitudeLongitude(dynamic node) {
     if (node is Map) {
       var latitudeEntry = findKeyEntry(node, ['latitude']);
       var longitudeEntry = findKeyEntry(node, ['longitude']);
@@ -156,9 +147,9 @@ class TypeGeolocationRender extends TypeRender {
         } else if (latitudeEntry.value is String &&
             longitudeEntry.value is String) {
           var lat =
-              Geolocation.parseLatitudeOrLongitudeValue(latitudeEntry.value);
+              Geolocation.parseLatitudeOrLongitudeValue(latitudeEntry.value)!;
           var long =
-              Geolocation.parseLatitudeOrLongitudeValue(longitudeEntry.value);
+              Geolocation.parseLatitudeOrLongitudeValue(longitudeEntry.value)!;
           return Geolocation(lat, long);
         }
       }
@@ -186,7 +177,7 @@ class TypeGeolocationRender extends TypeRender {
         ..type = 'text';
 
       input.onDoubleClick.listen((e) {
-        var geo2 = Geolocation.fromCoords(input.value);
+        var geo2 = Geolocation.fromCoords(input.value!);
         openGoogleMaps(geo2);
       });
 
@@ -208,8 +199,8 @@ class TypeGeolocationRender extends TypeRender {
       geoElem.children.add(button);
 
       valueProvider = (parent) {
-        final value = input.value;
-        var geo2 = Geolocation.fromCoords(value);
+        final value = input.value!;
+        var geo2 = Geolocation.fromCoords(value)!;
 
         if (nodeIsMap) {
           return {'latitude': geo2.latitude, 'longitude': geo2.longitude};
@@ -240,7 +231,7 @@ class TypeGeolocationRender extends TypeRender {
     return valueProvider;
   }
 
-  void openGoogleMaps(Geolocation geolocation) {
+  void openGoogleMaps(Geolocation? geolocation) {
     if (geolocation == null) return;
 
     print('openGoogleMaps> openDirections: $openDirections');

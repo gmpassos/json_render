@@ -1,3 +1,15 @@
+## 2.0.0-nullsafety.1
+
+- Dart 2.12.0:
+    - Sound null safety compatibility.
+    - Update CI dart commands.
+    - sdk: '>=2.12.0 <3.0.0'
+- intl: ^0.17.0
+- mercury_client: ^2.0.0-nullsafety.1
+- dom_tools: ^2.0.0-nullsafety.1
+- swiss_knife: ^3.0.1
+- chart_engine: ^2.0.0-nullsafety.1
+
 ## 1.3.8
 
 - Fix compatibility with new version of `mercury_client`.

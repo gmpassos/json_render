@@ -18,14 +18,14 @@ abstract class TypeMediaRender extends TypeRender {
     return render.httpCache.getURL(url);
   }
 
-  HttpResponse getURLCached(JSONRender render, String url) {
+  HttpResponse? getURLCached(JSONRender render, String url) {
     return render.httpCache.getCachedRequestURL(HttpMethod.GET, url);
   }
 
   Element createImageElementFromURL(
-      JSONRender render, bool lazyLoad, String url,
-      [String urlType]) {
-    if (DataURLBase64.matches(urlType)) {
+      JSONRender render, bool lazyLoad, String? url,
+      [String? urlType]) {
+    if (DataURLBase64.matches(urlType!)) {
       var div = createDivInline();
       var loadingElem = SpanElement()
         ..innerHtml = _randomPictureEntity()
@@ -34,10 +34,11 @@ abstract class TypeMediaRender extends TypeRender {
 
       var imgElem = ImageElement();
 
-      var cachedResponse = getURLCached(render, url);
+      var cachedResponse = getURLCached(render, url!);
 
       if (cachedResponse != null && cachedResponse.isOK) {
-        imgElem.src = '${urlType}${cachedResponse.bodyAsString}';
+        // ignore: unsafe_html
+        imgElem.src = '$urlType${cachedResponse.bodyAsString}';
         return imgElem;
       }
 
@@ -57,17 +58,19 @@ abstract class TypeMediaRender extends TypeRender {
       return div;
     } else {
       var imgElem = ImageElement();
+      // ignore: unsafe_html
       imgElem.src = url;
       return imgElem;
     }
   }
 
   void _loadElementBase64(JSONRender render, ImageElement imgElem, String url,
-      String urlType, Element loadingElement) {
+      String? urlType, Element loadingElement) {
     getURL(render, url).then((response) {
       if (response.isOK) {
-        imgElem.src = '${urlType}${response.bodyAsString}';
-        if (loadingElement != null) loadingElement.remove();
+        // ignore: unsafe_html
+        imgElem.src = '$urlType${response.bodyAsString}';
+        loadingElement.remove();
       }
     });
   }
@@ -85,11 +88,11 @@ String _randomPictureEntity() {
 
 /// Renders an image from an URL.
 class TypeImageURLRender extends TypeMediaRender {
-  final FilterURL filterURL;
+  final FilterURL? filterURL;
 
   final bool lazyLoad;
 
-  TypeImageURLRender({this.filterURL, bool lazyLoad})
+  TypeImageURLRender({this.filterURL, bool? lazyLoad})
       : lazyLoad = lazyLoad ?? true,
         super('image-url-Render');
 
@@ -99,7 +102,7 @@ class TypeImageURLRender extends TypeMediaRender {
     if (DataURLBase64.matches(node)) {
       return true;
     } else if (isHttpURL(node)) {
-      var url = node.trim();
+      String? url = node.toString().trim();
       if (node.contains('?')) {
         url = node.split('?')[0];
       }
@@ -120,36 +123,32 @@ class TypeImageURLRender extends TypeMediaRender {
 
   String imageMaxWidth = '40vw';
 
-  String imageMaxHeight;
+  String? imageMaxHeight;
 
   @override
   ValueProvider render(JSONRender render, DivElement output, dynamic node,
       dynamic nodeOriginal, NodeKey nodeKey) {
     var url = '$node';
-    String urlType;
+    String? urlType;
 
     if (filterURL != null) {
-      var ret = filterURL(url);
-      if (ret != null) {
-        url = ret.url;
-        urlType = ret.type;
-      }
+      var ret = filterURL!(url);
+      url = ret.url;
+      urlType = ret.type;
     }
 
     Element elem;
     ValueProvider valueProvider;
 
-    if (render.renderMode == JSONRenderMode.INPUT && false) {
-      elem = ImageElement()..src = url;
-      valueProvider = (parent) => node;
-    } else {
+    // How to edit an Image online? Take a Photo?
+    //if (render.renderMode == JSONRenderMode.INPUT && false) {
+    //} else
+    {
       elem = createImageElementFromURL(render, lazyLoad, url, urlType);
       valueProvider = (parent) => nodeOriginal;
     }
 
-    if (imageMaxWidth != null) {
-      elem.style.maxWidth = imageMaxWidth;
-    }
+    elem.style.maxWidth = imageMaxWidth;
 
     if (imageMaxHeight != null) {
       elem.style.maxHeight = imageMaxHeight;
@@ -161,7 +160,7 @@ class TypeImageURLRender extends TypeMediaRender {
       img.style.cursor = 'pointer';
 
       img.onClick.listen((e) {
-        showDialogImage(img.src);
+        showDialogImage(img.src!);
       });
     }
 
@@ -186,15 +185,15 @@ class TypeImageURLRender extends TypeMediaRender {
 ///   }
 /// ```
 class TypeImageViewerRender extends TypeMediaRender {
-  final FilterURL filterURL;
+  final FilterURL? filterURL;
 
   final bool lazyLoad;
 
-  TypeImageViewerRender({this.filterURL, bool lazyLoad})
+  TypeImageViewerRender({this.filterURL, bool? lazyLoad})
       : lazyLoad = lazyLoad ?? true,
         super('image-viewer-render');
 
-  String parseImageURL(node) {
+  String? parseImageURL(node) {
     if (node is Map) {
       var url = findKeyValue(node, ['url', 'image', 'imageURL']);
       return url != null ? '$url' : null;
@@ -202,12 +201,14 @@ class TypeImageViewerRender extends TypeMediaRender {
     return null;
   }
 
-  DateTime parseTime(node) {
+  DateTime? parseTime(node) {
     if (node is Map) {
       var time = findKeyValue(node, ['time', 'imageTime']);
 
       if (time != null) {
-        if (time is num) return DateTime.fromMillisecondsSinceEpoch(time);
+        if (time is num) {
+          return DateTime.fromMillisecondsSinceEpoch(time.toInt());
+        }
         if (time is String) {
           if (RegExp(r'^\d+$').hasMatch(time)) {
             return DateTime.fromMillisecondsSinceEpoch(int.parse(time));
@@ -219,7 +220,7 @@ class TypeImageViewerRender extends TypeMediaRender {
     return null;
   }
 
-  List<dynamic> parseClipKeys(node) {
+  List<dynamic>? parseClipKeys(node) {
     if (node is Map) {
       var clipEntry = findKeyEntry(node, ['clip', 'clipArea', 'cliparea']);
 
@@ -244,11 +245,11 @@ class TypeImageViewerRender extends TypeMediaRender {
   }
 
   // ignore: use_function_type_syntax_for_parameters
-  ViewerElement<T> _parseViewerElement<T>(node, List<String> keys,
-      {ViewerElement<T> Function() constructorNull,
-      ViewerElement<T> Function(T value) constructorValue,
-      T Function(List value) mapperList,
-      T Function(Map value) mapperMap}) {
+  ViewerElement<T>? _parseViewerElement<T>(node, List<String> keys,
+      {ViewerElement<T> Function()? constructorNull,
+      ViewerElement<T> Function(T value)? constructorValue,
+      T Function(List value)? mapperList,
+      T Function(Map value)? mapperMap}) {
     if (node is Map) {
       var entry = findKeyEntry(node, keys);
 
@@ -256,18 +257,20 @@ class TypeImageViewerRender extends TypeMediaRender {
         var entryValue = entry.value;
 
         if (entryValue == null) {
-          var viewerElement = constructorNull != null
-              ? constructorNull()
-              : constructorValue(null);
-          return viewerElement..key = entry.key;
+          var viewerElement =
+              constructorNull != null ? constructorNull() : null;
+          if (viewerElement != null) {
+            viewerElement.key = entry.key;
+          }
+          return viewerElement;
         } else if (entryValue is List) {
           if (mapperList == null) return null;
           var value = mapperList(entryValue);
-          return constructorValue(value)..key = entry.key;
+          return constructorValue!(value)..key = entry.key;
         } else if (entryValue is Map) {
           if (mapperMap == null) return null;
           var value = mapperMap(entryValue);
-          return constructorValue(value)..key = entry.key;
+          return constructorValue!(value)..key = entry.key;
         }
       }
     }
@@ -275,26 +278,31 @@ class TypeImageViewerRender extends TypeMediaRender {
     return null;
   }
 
-  ViewerElement<Rectangle<num>> parseClip(node) {
+  ViewerElement<Rectangle<num>>? parseClip(node) {
+    /*!!!*/
     return _parseViewerElement(node, ['clip', 'clipArea', 'cliparea'],
         constructorValue: CanvasImageViewer.clipViewerElement,
-        mapperList: parseRectangleFromList,
-        mapperMap: parseRectangleFromMap);
+        mapperList:
+            parseRectangleFromList as Rectangle<num> Function(List<dynamic>)?,
+        mapperMap: parseRectangleFromMap as Rectangle<num> Function(
+            Map<dynamic, dynamic>)?);
   }
 
-  ViewerElement<List<Rectangle<num>>> parseRectangles(node) {
+  ViewerElement<List<Rectangle<num>>>? parseRectangles(node) {
     return _parseViewerElement(node, ['rectangles', 'rects'],
         constructorValue: CanvasImageViewer.rectanglesViewerElement,
-        mapperList: (list) => list.map(parseRectangle).toList());
+        mapperList: ((list) =>
+            list.map(parseRectangle).toList() as List<Rectangle<num>>));
   }
 
-  ViewerElement<List<Point<num>>> parsePoints(node) {
+  ViewerElement<List<Point<num>>>? parsePoints(node) {
     return _parseViewerElement(node, ['points'],
         constructorValue: CanvasImageViewer.pointsViewerElement,
-        mapperList: (list) => list.map(parsePoint).toList());
+        mapperList: ((list) =>
+            list.map(parsePoint).toList() as List<Point<num>>));
   }
 
-  ViewerElement<List<Point<num>>> parsePerspectiveFilter(node) {
+  ViewerElement<List<Point<num>>>? parsePerspectiveFilter(node) {
     return _parseViewerElement(
         node, ['perspectiveFilter', 'perspectivefilter', 'perspective'],
         constructorValue: (value) =>
@@ -335,14 +343,12 @@ class TypeImageViewerRender extends TypeMediaRender {
 
     var time = parseTime(node);
 
-    String urlType;
+    String? urlType;
 
     if (filterURL != null) {
-      var ret = filterURL(imageURL);
-      if (ret != null) {
-        imageURL = ret.url;
-        urlType = ret.type;
-      }
+      var ret = filterURL!(imageURL);
+      imageURL = ret.url;
+      urlType = ret.type;
     }
 
     Element elem = createDivInline();
@@ -352,9 +358,9 @@ class TypeImageViewerRender extends TypeMediaRender {
     imgElemContainer.style.maxWidth = '70vw';
     imgElemContainer.style.maxHeight = '40vw';
 
-    ImageElement imgElem = imgElemContainer is ImageElement
+    var imgElem = imgElemContainer is ImageElement
         ? imgElemContainer
-        : imgElemContainer.querySelector('img');
+        : imgElemContainer.querySelector('img') as ImageElement;
 
     var valueProviderOriginal = (parent) => nodeOriginal;
     // ignore: omit_local_variable_types
@@ -380,18 +386,18 @@ class TypeImageViewerRender extends TypeMediaRender {
       dynamic node,
       Element parent,
       ImageElement imageElement,
-      ViewerElement<List<Point<num>>> perspectiveFilter,
-      ViewerElement<Rectangle<num>> clip,
-      ViewerElement<List<Rectangle<num>>> rectangles,
-      ViewerElement<List<Point<num>>> points,
-      DateTime time,
+      ViewerElement<List<Point<num>>>? perspectiveFilter,
+      ViewerElement<Rectangle<num>>? clip,
+      ViewerElement<List<Rectangle<num>>>? rectangles,
+      ViewerElement<List<Point<num>>>? points,
+      DateTime? time,
       ValueProviderReference valueProviderRef) {
     var w = imageElement.naturalWidth;
     var h = imageElement.naturalHeight;
 
     var inputMode = render.isInputRenderMode;
 
-    EditionType editionType;
+    EditionType? editionType;
     if (inputMode) {
       if (clip != null) {
         editionType = EditionType.CLIP;
@@ -429,7 +435,7 @@ class TypeImageViewerRender extends TypeMediaRender {
           var wKey = clipKeys[3];
           var hKey = clipKeys[4];
 
-          var clip = canvasImageViewer.clip;
+          var clip = canvasImageViewer.clip!;
           clip = Rectangle<int>(clip.left.toInt(), clip.top.toInt(),
               clip.width.toInt(), clip.height.toInt());
 

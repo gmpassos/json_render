@@ -17,7 +17,8 @@ void _adjustInputWidthByValueOnKeyPress(InputElement elem) {
 }
 
 void _adjustInputWidthByValue(InputElement elem, [int maxWidth = 800]) {
-  var widthChars = elem.value.length + 1.5;
+  var elemValue = elem.value ?? '';
+  var widthChars = elemValue.length + 1.5;
   if (widthChars < 2) widthChars = 2;
 
   elem.style.width = '${widthChars}ch';
@@ -29,7 +30,7 @@ class TypeTextRender extends TypeRender {
   bool renderQuotes;
 
   TypeTextRender([bool renderQuotes = true])
-      : renderQuotes = renderQuotes ?? true,
+      : renderQuotes = renderQuotes,
         super('text-render');
 
   @override
@@ -47,7 +48,7 @@ class TypeTextRender extends TypeRender {
       elem = InputElement()
         ..value = '$node'
         ..type = 'text';
-      _adjustInputWidthByValueOnKeyPress(elem);
+      _adjustInputWidthByValueOnKeyPress(elem as InputElement);
       valueProvider = (parent) =>
           normalizeJSONValuePrimitive((elem as InputElement).value, true);
     } else {
@@ -82,7 +83,7 @@ class TypeNumberRender extends TypeRender {
       elem = InputElement()
         ..value = '$node'
         ..type = 'number';
-      _adjustInputWidthByValueOnKeyPress(elem);
+      _adjustInputWidthByValueOnKeyPress(elem as InputElement);
       valueProvider =
           (parent) => normalizeJSONValueNumber((elem as InputElement).value);
     } else {
@@ -157,7 +158,7 @@ class TypeNullRender extends TypeRender {
 
 /// Renders an URL.
 class TypeURLRender extends TypeRender {
-  final FilterURL filterURL;
+  final FilterURL? filterURL;
 
   TypeURLRender({this.filterURL}) : super('url-render');
 
@@ -177,15 +178,15 @@ class TypeURLRender extends TypeRender {
     var target;
 
     if (filterURL != null) {
-      var ret = filterURL(url);
-      if (ret != null) {
-        url = ret.url;
-        urlLabel = ret.label;
-        target = ret.target;
-      }
+      var ret = filterURL!(url);
+      url = ret.url;
+      urlLabel = ret.label;
+      target = ret.target;
     }
 
     if (target != null && target.trim().isEmpty) target = null;
+
+    target ??= 'self';
 
     Element elem;
     ValueProvider valueProvider;
@@ -197,15 +198,17 @@ class TypeURLRender extends TypeRender {
 
       elem = input;
 
-      _adjustInputWidthByValueOnKeyPress(elem);
+      _adjustInputWidthByValueOnKeyPress(elem as InputElement);
 
       elem.onDoubleClick.listen((e) {
         var inputURL = input.value;
 
         if (inputURL == urlLabel) {
+          // ignore: unsafe_html
           window.open(url, target);
         } else {
-          window.open(inputURL, target);
+          // ignore: unsafe_html
+          window.open(inputURL!, target);
         }
       });
 
@@ -258,15 +261,17 @@ class TypeEmailRender extends TypeRender {
 
       elem = input;
 
-      _adjustInputWidthByValueOnKeyPress(elem);
+      _adjustInputWidthByValueOnKeyPress(elem as InputElement);
 
       elem.onDoubleClick.listen((e) {
         var inputEmail = input.value;
 
         if (inputEmail == emailLabel) {
-          window.open('mailto:$email', null);
+          // ignore: unsafe_html
+          window.open('mailto:$email', '_self');
         } else {
-          window.open('mailto:$inputEmail', null);
+          // ignore: unsafe_html
+          window.open('mailto:$inputEmail', '_self');
         }
       });
 
@@ -291,13 +296,13 @@ class TypeEmailRender extends TypeRender {
 class TypePercentageRender extends TypeRender {
   final int precision;
 
-  final List<String> _allowedKeys;
+  final List<String>? _allowedKeys;
 
-  TypePercentageRender([int precision, this._allowedKeys])
+  TypePercentageRender([int? precision, this._allowedKeys])
       : precision = precision != null && precision >= 0 ? precision : 2,
         super('percentage-render');
 
-  List<String> get allowedKeys => List.from(_allowedKeys).cast();
+  List<String> get allowedKeys => List.from(_allowedKeys!).cast();
 
   @override
   bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
@@ -305,7 +310,7 @@ class TypePercentageRender extends TypeRender {
   }
 
   bool _isAllowedKey(NodeKey nodeKey) {
-    if (allowedKeys == null || allowedKeys.isEmpty) return false;
+    if (allowedKeys.isEmpty) return false;
 
     var leafKey = nodeKey.leafKey.toLowerCase();
 
@@ -334,7 +339,7 @@ class TypePercentageRender extends TypeRender {
         return n;
       };
     } else {
-      var percentStr = formatPercent(percent, precision);
+      var percentStr = formatPercent(percent, precision: precision);
 
       elem = SpanElement()..text = percentStr;
 

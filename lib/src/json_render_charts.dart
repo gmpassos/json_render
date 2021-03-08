@@ -10,7 +10,7 @@ import 'json_render_base.dart';
 /// Tries to identify the best chart for each kind of data.
 /// Uses default behavior of package `chart_engine`.
 class TypeChartsRender extends TypeRender {
-  chart.ChartEngine _chartEngine;
+  late chart.ChartEngine _chartEngine;
 
   TypeChartsRender() : super('charts-render') {
     _chartEngine = chart.ChartEngineChartJS();
@@ -30,7 +30,7 @@ class TypeChartsRender extends TypeRender {
       dynamic nodeOriginal, NodeKey nodeKey) {
     var valueSet = JSONValueSet(true);
 
-    var chartData = chart.ChartData.from(node);
+    var chartData = chart.ChartData.from(node)!;
 
     _chartEngine.renderAsync(output, chartData);
 
