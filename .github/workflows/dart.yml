@@ -40,4 +40,4 @@ jobs:
       - name: Run Browser tests (Firefox)
         run: su -c 'DISPLAY=:0 cd $(< /tmp/test-dir.txt) && dart test -p firefox' tester
       - name: publish --dry-run
-        run: su -c 'DISPLAY=:0 cd $(< /tmp/test-dir.txt) && dart pub publish --dry-run' tester
+        run: su -c 'export DISPLAY=:0 && cd $(< /tmp/test-dir.txt) && dart pub publish --dry-run' tester
