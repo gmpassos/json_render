@@ -142,15 +142,15 @@ class TypeGeolocationRender extends TypeRender {
       var longitudeEntry = findKeyEntry(node, ['longitude']);
 
       if (latitudeEntry != null && longitudeEntry != null) {
-        if (latitudeEntry.value is num && longitudeEntry.value is num) {
-          return Geolocation(latitudeEntry.value, longitudeEntry.value);
-        } else if (latitudeEntry.value is String &&
-            longitudeEntry.value is String) {
-          var lat =
-              Geolocation.parseLatitudeOrLongitudeValue(latitudeEntry.value)!;
-          var long =
-              Geolocation.parseLatitudeOrLongitudeValue(longitudeEntry.value)!;
+        var lat = latitudeEntry.value;
+        var long = longitudeEntry.value;
+
+        if (lat is num && long is num) {
           return Geolocation(lat, long);
+        } else if (lat is String && long is String) {
+          var lat2 = Geolocation.parseLatitudeOrLongitudeValue(lat)!;
+          var long2 = Geolocation.parseLatitudeOrLongitudeValue(long)!;
+          return Geolocation(lat2, long2);
         }
       }
     } else if (node is String) {

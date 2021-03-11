@@ -254,23 +254,24 @@ class TypeImageViewerRender extends TypeMediaRender {
       var entry = findKeyEntry(node, keys);
 
       if (entry != null) {
+        var entryKey = parseString(entry.key, '');
         var entryValue = entry.value;
 
         if (entryValue == null) {
           var viewerElement =
               constructorNull != null ? constructorNull() : null;
           if (viewerElement != null) {
-            viewerElement.key = entry.key;
+            viewerElement.key = entryKey;
           }
           return viewerElement;
         } else if (entryValue is List) {
           if (mapperList == null) return null;
           var value = mapperList(entryValue);
-          return constructorValue!(value)..key = entry.key;
+          return constructorValue!(value)..key = entryKey;
         } else if (entryValue is Map) {
           if (mapperMap == null) return null;
           var value = mapperMap(entryValue);
-          return constructorValue!(value)..key = entry.key;
+          return constructorValue!(value)..key = entryKey;
         }
       }
     }
