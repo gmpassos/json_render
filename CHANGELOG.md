@@ -1,3 +1,9 @@
+## 2.0.1
+
+- mercury_client: ^2.0.1
+- dom_tools: ^2.0.1
+- chart_engine: ^2.0.1
+
 ## 2.0.0-nullsafety.2
 
 - Null Safety adjustments.
