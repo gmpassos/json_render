@@ -1,6 +1,6 @@
 import 'package:dom_tools/dom_tools.dart';
 
-const JSON_RENDER_THEME_DARK = {
+const jsonRenderThemeDark = {
   'list-render': TextStyle(
       color: StyleColor.fromHex('808080'),
       backgroundColor: StyleColor.fromRGBa('0,0,0, 0.07'),
@@ -65,7 +65,7 @@ const JSON_RENDER_THEME_DARK = {
       TextStyle(borderColor: StyleColor.fromRGBa('255,255,255, 0.30')),
 };
 
-const JSON_RENDER_THEME_LIGHT = {
+const jsonRenderThemeLight = {
   'list-render': TextStyle(
       color: StyleColor.fromHex('363636'),
       backgroundColor: StyleColor.fromRGBa('0,0,0, 0.07'),
@@ -121,5 +121,5 @@ const JSON_RENDER_THEME_LIGHT = {
       TextStyle(borderColor: StyleColor.fromRGBa('255,255,255, 0.30')),
 };
 
-final CSSThemeSet JSON_RENDER_DEFAULT_THEME_SET = CSSThemeSet(
-    'json_render__', [JSON_RENDER_THEME_DARK, JSON_RENDER_THEME_LIGHT]);
+final CSSThemeSet jsonRenderDefaultThemeSet =
+    CSSThemeSet('json_render__', [jsonRenderThemeDark, jsonRenderThemeLight]);

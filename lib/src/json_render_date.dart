@@ -6,19 +6,18 @@ import 'package:swiss_knife/swiss_knife.dart';
 
 import 'json_render_base.dart';
 
-final DATE_FORMAT_DATETIME_LOCAL =
+final _dateFormatDatetimeLocal =
     DateFormat('yyyy-MM-ddTHH:mm:ss', Intl.getCurrentLocale());
 
-final DATE_FORMAT_YYYY_MM_DD =
-    DateFormat('yyyy/MM/dd', Intl.getCurrentLocale());
+final _dateFormatYYYYMMDD = DateFormat('yyyy/MM/dd', Intl.getCurrentLocale());
 
-final DATE_FORMAT_YYYY_MM_DD_HH_MM_SS =
+final _dateFormatYYYYMMDDHHMMSS =
     DateFormat('yyyy/MM/dd HH:mm:ss', Intl.getCurrentLocale());
 
-final DATE_REGEXP_YYYY_MM_DD =
+final _dateRegexpYYYYMMDD =
     RegExp(r'(?:\d\d\d\d/\d\d/\d\d|\d\d\d\d-\d\d-\d\d)');
 
-final DATE_REGEXP_YYYY_MM_DD_HH_MM_SS =
+final _dateRegexpYYYYMMDDHHMMSS =
     RegExp(r'(?:\d\d\d\d/\d\d/\d\d|\d\d\d\d-\d\d-\d\d) \d\d:\d\d:\d\d');
 
 /// Renders a Date value.
@@ -28,8 +27,8 @@ class TypeDateRender extends TypeRender {
   @override
   bool matches(node, nodeParent, NodeKey nodeKey) {
     if (node is String) {
-      if (DATE_REGEXP_YYYY_MM_DD.hasMatch(node)) return true;
-      if (DATE_REGEXP_YYYY_MM_DD_HH_MM_SS.hasMatch(node)) return true;
+      if (_dateRegexpYYYYMMDD.hasMatch(node)) return true;
+      if (_dateRegexpYYYYMMDDHHMMSS.hasMatch(node)) return true;
     }
     return false;
   }
@@ -38,14 +37,14 @@ class TypeDateRender extends TypeRender {
   ValueProvider render(JSONRender render, DivElement output, node, nodeOriginal,
       NodeKey nodeKey) {
     var s = node as String;
-    var showHour = DATE_REGEXP_YYYY_MM_DD_HH_MM_SS.hasMatch(s);
+    var showHour = _dateRegexpYYYYMMDDHHMMSS.hasMatch(s);
     var dateTime = DateTime.parse(s).toLocal();
 
     Element elem;
     ValueProvider valueProvider;
 
-    if (render.renderMode == JSONRenderMode.INPUT) {
-      var dateTimeLocal = DATE_FORMAT_DATETIME_LOCAL.format(dateTime);
+    if (render.renderMode == JSONRenderMode.input) {
+      var dateTimeLocal = _dateFormatDatetimeLocal.format(dateTime);
 
       elem = InputElement()
         ..value = dateTimeLocal
@@ -54,14 +53,14 @@ class TypeDateRender extends TypeRender {
       valueProvider = (parent) {
         var time = DateTime.parse((elem as InputElement).value!);
         var dateTimeStr = showHour
-            ? DATE_FORMAT_YYYY_MM_DD_HH_MM_SS.format(time)
-            : DATE_FORMAT_YYYY_MM_DD.format(time);
+            ? _dateFormatYYYYMMDDHHMMSS.format(time)
+            : _dateFormatYYYYMMDD.format(time);
         return dateTimeStr;
       };
     } else {
       var dateTimeStr = showHour
-          ? DATE_FORMAT_YYYY_MM_DD_HH_MM_SS.format(dateTime)
-          : DATE_FORMAT_YYYY_MM_DD.format(dateTime);
+          ? _dateFormatYYYYMMDDHHMMSS.format(dateTime)
+          : _dateFormatYYYYMMDD.format(dateTime);
 
       elem = SpanElement()..text = dateTimeStr;
 
@@ -84,9 +83,8 @@ class TypeDateRender extends TypeRender {
 class TypeUnixEpochRender extends TypeRender {
   final bool inMilliseconds;
 
-  TypeUnixEpochRender([bool inMilliseconds = true])
-      : inMilliseconds = inMilliseconds,
-        super('unix-epoch-render');
+  TypeUnixEpochRender([this.inMilliseconds = true])
+      : super('unix-epoch-render');
 
   bool get inSeconds => !inMilliseconds;
 
@@ -147,8 +145,8 @@ class TypeUnixEpochRender extends TypeRender {
     Element elem;
     ValueProvider valueProvider;
 
-    if (render.renderMode == JSONRenderMode.INPUT) {
-      var dateTimeLocal = DATE_FORMAT_DATETIME_LOCAL.format(dateTime);
+    if (render.renderMode == JSONRenderMode.input) {
+      var dateTimeLocal = _dateFormatDatetimeLocal.format(dateTime);
 
       elem = InputElement()
         ..value = dateTimeLocal
@@ -164,7 +162,7 @@ class TypeUnixEpochRender extends TypeRender {
         return time;
       };
     } else {
-      var dateTimeStr = DATE_FORMAT_YYYY_MM_DD_HH_MM_SS.format(dateTime);
+      var dateTimeStr = _dateFormatYYYYMMDDHHMMSS.format(dateTime);
 
       elem = SpanElement()..text = dateTimeStr;
 
@@ -196,9 +194,8 @@ class TypeTimeRender extends TypeRender {
 
   final List<String>? _allowedKeys;
 
-  TypeTimeRender([bool inMilliseconds = true, this._allowedKeys])
-      : inMilliseconds = inMilliseconds,
-        super('time-render');
+  TypeTimeRender([this.inMilliseconds = true, this._allowedKeys])
+      : super('time-render');
 
   bool get inSeconds => !inMilliseconds;
 
@@ -253,7 +250,7 @@ class TypeTimeRender extends TypeRender {
     Element elem;
     ValueProvider valueProvider;
 
-    if (render.renderMode == JSONRenderMode.INPUT) {
+    if (render.renderMode == JSONRenderMode.input) {
       elem = InputElement()
         ..value = '$timeOriginal'
         ..type = 'number';

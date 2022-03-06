@@ -13,7 +13,7 @@ import 'json_render_media.dart';
 import 'json_render_types.dart';
 
 /// Enum for render modes.
-enum JSONRenderMode { INPUT, VIEW }
+enum JSONRenderMode { input, view }
 
 String? convertToJSONAsString(dynamic jsonNode, [String indent = '  ']) {
   if (jsonNode == null) return null;
@@ -58,7 +58,7 @@ num? normalizeJSONValueNumber(dynamic value) {
 
 typedef ValueProvider = dynamic Function(dynamic parent);
 
-ValueProvider VALUE_PROVIDER_NULL = (parent) => null;
+dynamic valueProviderNull(parent) => null;
 
 class ValueProviderReference {
   ValueProvider valueProvider;
@@ -80,7 +80,7 @@ class JSONValueSet {
   final Map<NodeKey, ValueProvider> values = {};
 
   void put(NodeKey key, ValueProvider? val) {
-    values[key] = val ?? VALUE_PROVIDER_NULL;
+    values[key] = val ?? valueProviderNull;
   }
 
   String? buildJSONAsString(dynamic parent) {
@@ -163,12 +163,12 @@ class JSONRender {
 
   String get jsonString => '$_json';
 
-  /// Returns [true] if this is in input mode: [JSONRenderMode.INPUT]
-  JSONRenderMode renderMode = JSONRenderMode.VIEW;
+  /// Returns [true] if this is in input mode: [JSONRenderMode.input]
+  JSONRenderMode renderMode = JSONRenderMode.view;
 
-  bool get isInputRenderMode => renderMode == JSONRenderMode.INPUT;
+  bool get isInputRenderMode => renderMode == JSONRenderMode.input;
 
-  /// Rebuilds JSON from current rendered tree. If in [JSONRenderMode.INPUT]
+  /// Rebuilds JSON from current rendered tree. If in [JSONRenderMode.input]
   /// it will update tree values.
   dynamic buildJSON() {
     if (_treeValueProvider == null) return null;
@@ -464,7 +464,7 @@ class JSONRender {
     return _typeActions.remove(typeAction);
   }
 
-  CSSThemeSet cssThemeSet = JSON_RENDER_DEFAULT_THEME_SET;
+  CSSThemeSet cssThemeSet = jsonRenderDefaultThemeSet;
 
   String get cssThemePrefix => cssThemeSet.cssPrefix;
 
@@ -473,10 +473,10 @@ class JSONRender {
     cssThemeSet.ensureThemeLoaded();
   }
 
-  static final HttpCache DEFAULT_HTTP_CACHE = HttpCache(
+  static final HttpCache defaultHttpCache = HttpCache(
       maxCacheMemory: 1024 * 1024 * 16, timeout: Duration(minutes: 5));
 
-  HttpCache httpCache = DEFAULT_HTTP_CACHE;
+  HttpCache httpCache = defaultHttpCache;
 }
 
 class URLFiltered {
@@ -499,7 +499,7 @@ class URLFiltered {
   }
 }
 
-typedef FilterURL = URLFiltered Function(String? URL);
+typedef FilterURL = URLFiltered Function(String? url);
 
 class NodeKey {
   final List<String> path;
@@ -585,7 +585,12 @@ abstract class TypeRender {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is TypeRender && runtimeType == other.runtimeType;
+      other is TypeRender &&
+          runtimeType == other.runtimeType &&
+          cssClass == other.cssClass;
+
+  @override
+  int get hashCode => cssClass.hashCode;
 }
 
 class _NodeMapping {

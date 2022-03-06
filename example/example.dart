@@ -7,7 +7,7 @@ void main() {
 
   var jsonRender = JSONRender.fromJSONAsString(jsonStr)
     // Show input elements:
-    ..renderMode = JSONRenderMode.INPUT
+    ..renderMode = JSONRenderMode.input
     // Renders Strings with image URL as image elements in lazyload mode (only loads image when viewed, reducing bandwidth usage):
     ..addTypeRender(TypeImageURLRender(lazyLoad: true))
     // Renders numbers in unix epoch time-millis range as dates:

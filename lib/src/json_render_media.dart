@@ -8,7 +8,7 @@ import 'package:swiss_knife/swiss_knife.dart';
 
 import 'json_render_base.dart';
 
-TrackElementInViewport _TRACK_ELEMENTS_IN_VIEWPORT = TrackElementInViewport();
+TrackElementInViewport _trackElementsInViewport = TrackElementInViewport();
 
 /// Base class to render images and other types of media.
 abstract class TypeMediaRender extends TypeRender {
@@ -25,7 +25,7 @@ abstract class TypeMediaRender extends TypeRender {
   Element createImageElementFromURL(
       JSONRender render, bool lazyLoad, String? url,
       [String? urlType]) {
-    if (DataURLBase64.matches(urlType!)) {
+    if (urlType != null && DataURLBase64.matches(urlType)) {
       var div = createDivInline();
       var loadingElem = SpanElement()
         ..innerHtml = _randomPictureEntity()
@@ -43,7 +43,7 @@ abstract class TypeMediaRender extends TypeRender {
       }
 
       if (lazyLoad) {
-        _TRACK_ELEMENTS_IN_VIEWPORT.track(imgElem, onEnterViewport: (elem) {
+        _trackElementsInViewport.track(imgElem, onEnterViewport: (elem) {
           _loadElementBase64(render, imgElem, url, urlType, loadingElem);
         });
       } else {
@@ -76,12 +76,12 @@ abstract class TypeMediaRender extends TypeRender {
   }
 }
 
-Random _RANDOM = Random();
+Random _random = Random();
 
-List<String> _PICTURE_CODES = '1F304 1F305 1F306'.split(RegExp(r'\s+'));
+List<String> _pictureCodes = '1F304 1F305 1F306'.split(RegExp(r'\s+'));
 
 String _randomPictureEntity() {
-  var code = _PICTURE_CODES[_RANDOM.nextInt(_PICTURE_CODES.length)];
+  var code = _pictureCodes[_random.nextInt(_pictureCodes.length)];
   var entity = '&#x$code;';
   return entity;
 }
@@ -97,24 +97,32 @@ class TypeImageURLRender extends TypeMediaRender {
         super('image-url-Render');
 
   static bool matchesNode(node) {
-    if (!(node is String)) return false;
+    if (node is! String) return false;
 
     if (DataURLBase64.matches(node)) {
       return true;
-    } else if (isHttpURL(node)) {
-      String? url = node.toString().trim();
-      if (node.contains('?')) {
+    } else if (isHttpURL(node) || _isFilePath(node)) {
+      var url = node.toString().trim();
+      if (url.contains('?')) {
         url = node.split('?')[0];
       }
 
-      var match = RegExp(r'(?:png|jpe?g|gif|webp)$', caseSensitive: false)
-          .hasMatch(url);
-
+      var match = _hasImageExtension(url);
       return match;
     }
 
     return false;
   }
+
+  static final RegExp _regexpFilePath =
+      RegExp(r'^(?:\.\.?/[\w-.]+|\w[\w-.]*)(?:/[\w-.]+)+(?:\.\w+)$');
+
+  static bool _isFilePath(String s) => _regexpFilePath.hasMatch(s);
+
+  static final RegExp _regexpImageExtension =
+      RegExp(r'(?:png|jpe?g|gif|webp)$', caseSensitive: false);
+
+  static bool _hasImageExtension(String s) => _regexpImageExtension.hasMatch(s);
 
   @override
   bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
@@ -244,12 +252,11 @@ class TypeImageViewerRender extends TypeMediaRender {
     return null;
   }
 
-  // ignore: use_function_type_syntax_for_parameters
   ViewerElement<T>? _parseViewerElement<T>(node, List<String> keys,
       {ViewerElement<T> Function()? constructorNull,
       ViewerElement<T> Function(T value)? constructorValue,
-      T Function(List value)? mapperList,
-      T Function(Map value)? mapperMap}) {
+      T? Function(List value)? mapperList,
+      T? Function(Map value)? mapperMap}) {
     if (node is Map) {
       var entry = findKeyEntry(node, keys);
 
@@ -267,10 +274,12 @@ class TypeImageViewerRender extends TypeMediaRender {
         } else if (entryValue is List) {
           if (mapperList == null) return null;
           var value = mapperList(entryValue);
+          if (value == null) return null;
           return constructorValue!(value)..key = entryKey;
         } else if (entryValue is Map) {
           if (mapperMap == null) return null;
           var value = mapperMap(entryValue);
+          if (value == null) return null;
           return constructorValue!(value)..key = entryKey;
         }
       }
@@ -280,13 +289,11 @@ class TypeImageViewerRender extends TypeMediaRender {
   }
 
   ViewerElement<Rectangle<num>>? parseClip(node) {
-    /*!!!*/
     return _parseViewerElement(node, ['clip', 'clipArea', 'cliparea'],
         constructorValue: CanvasImageViewer.clipViewerElement,
-        mapperList:
-            parseRectangleFromList as Rectangle<num> Function(List<dynamic>)?,
-        mapperMap: parseRectangleFromMap as Rectangle<num> Function(
-            Map<dynamic, dynamic>)?);
+        mapperList: parseRectangleFromList,
+        mapperMap: (m) => parseRectangleFromMap(
+            m.map((key, value) => MapEntry('$key', value))));
   }
 
   ViewerElement<List<Rectangle<num>>>? parseRectangles(node) {
@@ -363,10 +370,9 @@ class TypeImageViewerRender extends TypeMediaRender {
         ? imgElemContainer
         : imgElemContainer.querySelector('img') as ImageElement;
 
-    var valueProviderOriginal = (parent) => nodeOriginal;
-    // ignore: omit_local_variable_types
-    ValueProviderReference valueProviderRef =
-        ValueProviderReference(valueProviderOriginal);
+    valueProviderOriginal(parent) => nodeOriginal;
+
+    var valueProviderRef = ValueProviderReference(valueProviderOriginal);
 
     imgElem.onLoad.listen((e) {
       renderLoadedImage(render, node, elem, imgElem, perspectiveFilter, clip,
@@ -401,16 +407,16 @@ class TypeImageViewerRender extends TypeMediaRender {
     EditionType? editionType;
     if (inputMode) {
       if (clip != null) {
-        editionType = EditionType.CLIP;
+        editionType = EditionType.clip;
       } else if (points != null) {
-        editionType = EditionType.POINTS;
+        editionType = EditionType.points;
       } else if (perspectiveFilter != null) {
-        editionType = EditionType.PERSPECTIVE;
+        editionType = EditionType.perspective;
       }
     }
 
     var canvas = CanvasElement(width: w, height: h);
-    var gridSize = editionType == EditionType.PERSPECTIVE
+    var gridSize = editionType == EditionType.perspective
         ? CanvasImageViewer.gridSizeViewerElement(0.05)
         : null;
 
@@ -425,7 +431,7 @@ class TypeImageViewerRender extends TypeMediaRender {
         time: time,
         editable: editionType);
 
-    if (editionType == EditionType.CLIP) {
+    if (editionType == EditionType.clip) {
       var clipKeys = parseClipKeys(node);
 
       if (clipKeys != null) {
@@ -461,7 +467,7 @@ class TypeImageViewerRender extends TypeMediaRender {
           return nodeEdited;
         };
       }
-    } else if (editionType == EditionType.POINTS) {
+    } else if (editionType == EditionType.points) {
       valueProviderRef.valueProvider = (parent) {
         var pointsKey = canvasImageViewer.pointsKey;
         var points = canvasImageViewer.points ?? [];
@@ -476,7 +482,7 @@ class TypeImageViewerRender extends TypeMediaRender {
         nodeEdited[pointsKey] = pointsCoords;
         return nodeEdited;
       };
-    } else if (editionType == EditionType.PERSPECTIVE) {
+    } else if (editionType == EditionType.perspective) {
       valueProviderRef.valueProvider = (parent) {
         var perspectiveKey = canvasImageViewer.perspectiveKey;
         var perspective = canvasImageViewer.perspective ?? [];

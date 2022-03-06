@@ -19,12 +19,12 @@ class Geolocation {
     return Geolocation(coords.latitude!, coords.longitude!);
   }
 
-  static final RegExp GEOLOCATION_FORMAT =
+  static final RegExp _geolocationFormat =
       RegExp(r'([-=]?)(\d+[,.]?\d*)\s*[°o]?\s*(\w)');
 
   static num? parseLatitudeOrLongitudeValue(String s,
       [bool onlyWithCardinals = false]) {
-    var match = GEOLOCATION_FORMAT.firstMatch(s);
+    var match = _geolocationFormat.firstMatch(s);
     if (match == null) return null;
 
     var signal = match.group(1);
@@ -169,7 +169,7 @@ class TypeGeolocationRender extends TypeRender {
     Element geoElem;
     ValueProvider valueProvider;
 
-    if (render.renderMode == JSONRenderMode.INPUT) {
+    if (render.renderMode == JSONRenderMode.input) {
       var geoStr = geo.toString();
 
       var input = InputElement()

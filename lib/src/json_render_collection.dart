@@ -76,7 +76,6 @@ DivElement _createClosableContent(
     var elemOpen = SpanElement()
       ..innerHtml = simpleContent ? ' $textOpener' : ' $textOpener<br>'
       ..style.verticalAlign = 'top';
-    ;
 
     var elemClose = SpanElement()
       ..innerHtml =
@@ -119,7 +118,6 @@ DivElement _createContent(
     var elemOpen = SpanElement()
       ..innerHtml = simpleContent ? ' $textOpener' : ' $textOpener<br>'
       ..style.verticalAlign = 'top';
-    ;
 
     var elemClose = SpanElement()
       ..innerHtml =
@@ -477,7 +475,7 @@ class TypeTableRender extends TypeRender {
   @override
   bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
     if (node is List) {
-      var nonMap = node.firstWhere((e) => !(e is Map), orElse: () => null);
+      var nonMap = node.firstWhere((e) => e is! Map, orElse: () => null);
       return nonMap == null;
     }
     return false;
@@ -568,7 +566,7 @@ class TypeTableRender extends TypeRender {
             if (entry.containsKey(columnKey)) {
               assert(entry[columnKey] == null, 'Not null: ${entry[columnKey]}');
               var elemNodeKey = entryNodeKey.append(columnKey);
-              valueSetEntry.put(elemNodeKey, VALUE_PROVIDER_NULL);
+              valueSetEntry.put(elemNodeKey, valueProviderNull);
             }
             continue;
           } else if (isIgnoredColumn(columnKey)) {
@@ -618,12 +616,11 @@ class TypeTableRender extends TypeRender {
 
   Map<String, bool> getCollectionColumns(
       JSONRender render, NodeKey nodeKey, List<Map> list) {
-    // ignore: omit_local_variable_types
-    Map<String, bool> columns = {};
+    var columns = <String, bool>{};
 
-    var legnth = list.length;
+    var length = list.length;
 
-    for (var i = 0; i < legnth; ++i) {
+    for (var i = 0; i < length; ++i) {
       var elem = list[i];
 
       var entryNodeKey = nodeKey.append('$i');
@@ -636,7 +633,7 @@ class TypeTableRender extends TypeRender {
 
   void extractColumns(JSONRender render, Map map, NodeKey entryNodeKey,
       Map<String, bool> columns) {
-    map.entries.forEach((entry) {
+    for (var entry in map.entries) {
       var key = entry.key;
       var val = entry.value;
 
@@ -651,6 +648,6 @@ class TypeTableRender extends TypeRender {
       } else {
         columns[key] ??= false;
       }
-    });
+    }
   }
 }

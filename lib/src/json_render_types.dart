@@ -29,9 +29,7 @@ void _adjustInputWidthByValue(InputElement elem, [int maxWidth = 800]) {
 class TypeTextRender extends TypeRender {
   bool renderQuotes;
 
-  TypeTextRender([bool renderQuotes = true])
-      : renderQuotes = renderQuotes,
-        super('text-render');
+  TypeTextRender([this.renderQuotes = true]) : super('text-render');
 
   @override
   bool matches(node, dynamic nodeParent, NodeKey nodeKey) {
@@ -44,7 +42,7 @@ class TypeTextRender extends TypeRender {
     Element elem;
     ValueProvider valueProvider;
 
-    if (render.renderMode == JSONRenderMode.INPUT) {
+    if (render.renderMode == JSONRenderMode.input) {
       elem = InputElement()
         ..value = '$node'
         ..type = 'text';
@@ -79,7 +77,7 @@ class TypeNumberRender extends TypeRender {
     Element elem;
     ValueProvider valueProvider;
 
-    if (render.renderMode == JSONRenderMode.INPUT) {
+    if (render.renderMode == JSONRenderMode.input) {
       elem = InputElement()
         ..value = '$node'
         ..type = 'number';
@@ -116,7 +114,7 @@ class TypeBoolRender extends TypeRender {
     Element elem;
     ValueProvider valueProvider;
 
-    if (render.renderMode == JSONRenderMode.INPUT) {
+    if (render.renderMode == JSONRenderMode.input) {
       elem = InputElement()
         ..checked = val
         ..type = 'checkbox';
@@ -148,7 +146,7 @@ class TypeNullRender extends TypeRender {
       dynamic nodeOriginal, NodeKey nodeKey) {
     var elem = SpanElement()..text = 'null';
     output.children.add(elem);
-    var valueProvider = VALUE_PROVIDER_NULL;
+    var valueProvider = valueProviderNull;
 
     applyCSS(render, output);
 
@@ -175,7 +173,7 @@ class TypeURLRender extends TypeRender {
       dynamic nodeOriginal, NodeKey nodeKey) {
     var urlLabel = '$node';
     var url = urlLabel.trim();
-    var target;
+    String? target;
 
     if (filterURL != null) {
       var ret = filterURL!(url);
@@ -191,7 +189,7 @@ class TypeURLRender extends TypeRender {
     Element elem;
     ValueProvider valueProvider;
 
-    if (render.renderMode == JSONRenderMode.INPUT) {
+    if (render.renderMode == JSONRenderMode.input) {
       var input = InputElement()
         ..value = urlLabel
         ..type = 'url';
@@ -205,20 +203,18 @@ class TypeURLRender extends TypeRender {
 
         if (inputURL == urlLabel) {
           // ignore: unsafe_html
-          window.open(url, target);
+          window.open(url, target!);
         } else {
           // ignore: unsafe_html
-          window.open(inputURL!, target);
+          window.open(inputURL!, target!);
         }
       });
 
       valueProvider = (parent) => (elem as InputElement).value;
     } else {
-      var a = AnchorElement(href: url)..text = urlLabel;
-
-      if (target != null) {
-        a.target = target;
-      }
+      var a = AnchorElement(href: url)
+        ..text = urlLabel
+        ..target = target;
 
       elem = a;
 
@@ -254,7 +250,7 @@ class TypeEmailRender extends TypeRender {
     Element elem;
     ValueProvider valueProvider;
 
-    if (render.renderMode == JSONRenderMode.INPUT) {
+    if (render.renderMode == JSONRenderMode.input) {
       var input = InputElement()
         ..value = emailLabel
         ..type = 'email';
@@ -329,7 +325,7 @@ class TypePercentageRender extends TypeRender {
     Element elem;
     ValueProvider valueProvider;
 
-    if (render.renderMode == JSONRenderMode.INPUT) {
+    if (render.renderMode == JSONRenderMode.input) {
       elem = InputElement()
         ..value = '$percent'
         ..type = 'range';
@@ -377,8 +373,7 @@ class TypeSelectRender extends TypeRender {
   @override
   ValueProvider render(JSONRender render, DivElement output, dynamic node,
       dynamic nodeOriginal, NodeKey nodeKey) {
-    // ignore: omit_local_variable_types
-    List<Map> options = (node as List).cast();
+    var options = (node as List).cast<Map>().toList();
 
     var elem = SelectElement();
 
@@ -388,18 +383,15 @@ class TypeSelectRender extends TypeRender {
       elem.add(optionElement, null);
     }
 
-    ValueProvider valueProvider = (parent) {
-      return elem.options.map((opt) {
-        // ignore: omit_local_variable_types
-        Map<String, dynamic> map = {'value': opt.value, 'label': opt.label};
-        if (opt.selected) {
-          map['selected'] = true;
-        }
-        return map;
-      }).toList();
-    };
+    valueProvider(parent) => elem.options
+        .map((opt) => <String, dynamic>{
+              'value': opt.value,
+              'label': opt.label,
+              if (opt.selected) 'selected': true
+            })
+        .toList();
 
-    if (render.renderMode != JSONRenderMode.INPUT) {
+    if (render.renderMode != JSONRenderMode.input) {
       elem.disabled = true;
     }
 

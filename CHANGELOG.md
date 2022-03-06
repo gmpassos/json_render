@@ -1,3 +1,16 @@
+## 2.0.2
+
+- Dart `2.16`:
+  - Organize imports.
+  - Fix new lints (breaks some enum names).
+- Fix some `Null-Safe` issues.
+- sdk: '>=2.13.0 <3.0.0'
+- mercury_client: ^2.1.3
+- dom_tools: ^2.1.0
+- swiss_knife: ^3.0.8
+- chart_engine: ^2.0.3
+- lints: ^1.0.1
+
 ## 2.0.1
 
 - mercury_client: ^2.0.1
