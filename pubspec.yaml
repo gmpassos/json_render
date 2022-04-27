@@ -16,6 +16,7 @@ dependencies:
 dev_dependencies:
   lints: ^1.0.1
   test: ^1.16.8
+  dependency_validator: ^3.1.0
 
 #dependency_overrides:
 #  mercury_client:

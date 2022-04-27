@@ -1,6 +1,8 @@
 ## 2.0.4
 
+- Improved GitHub CI.
 - mercury_client: ^2.1.5
+- dependency_validator: ^3.1.0
 
 ## 2.0.3
 
