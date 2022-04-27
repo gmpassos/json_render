@@ -1,3 +1,10 @@
+## 2.0.3
+
+- mercury_client: ^2.1.4
+- dom_tools: ^2.1.1
+- swiss_knife: ^3.1.1
+- chart_engine: ^2.0.4
+
 ## 2.0.2
 
 - Dart `2.16`:
