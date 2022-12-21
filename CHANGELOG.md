@@ -1,3 +1,14 @@
+## 2.0.5
+
+- lints: ^2.0.1
+- test: ^1.22.1
+- dependency_validator: ^3.2.2
+- intl: ^0.18.0
+- mercury_client: ^2.1.7
+- dom_tools: ^2.1.9
+- swiss_knife: ^3.1.3
+- chart_engine: ^2.0.5
+
 ## 2.0.4
 
 - Improved GitHub CI.
