@@ -62,7 +62,7 @@ class Geolocation {
   }
 
   static String formatGeolocation(Point geo) {
-    return formatLatitude(geo.x) + ' ' + formatLongitude(geo.y);
+    return '${formatLatitude(geo.x)} ${formatLongitude(geo.y)}';
   }
 
   /// The latitude of the coordinate.
