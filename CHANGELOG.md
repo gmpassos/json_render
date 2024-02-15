@@ -1,3 +1,17 @@
+## 2.1.0
+
+- sdk: '>=3.3.0 <4.0.0'
+
+- intl: ^0.19.0
+- mercury_client: ^2.2.1
+- dom_tools: ^2.3.0
+- swiss_knife: ^3.2.0
+- chart_engine: ^2.1.0
+
+- lints: ^3.0.0
+- test: ^1.25.2
+- dependency_validator: ^3.2.3
+
 ## 2.0.5
 
 - lints: ^2.0.1
