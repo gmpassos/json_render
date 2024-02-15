@@ -12,7 +12,7 @@ TrackElementInViewport _trackElementsInViewport = TrackElementInViewport();
 
 /// Base class to render images and other types of media.
 abstract class TypeMediaRender extends TypeRender {
-  TypeMediaRender(String cssClass) : super(cssClass);
+  TypeMediaRender(super.cssClass);
 
   Future<HttpResponse> getURL(JSONRender render, String url) {
     return render.httpCache.getURL(url);
@@ -115,7 +115,7 @@ class TypeImageURLRender extends TypeMediaRender {
   }
 
   static final RegExp _regexpFilePath =
-      RegExp(r'^(?:\.\.?/[\w-.]+|\w[\w-.]*)(?:/[\w-.]+)+(?:\.\w+)$');
+      RegExp(r'^(?:\.\.?/[\w-.]+|\w[\w-.]*)(?:/[\w-.]+)+\.\w+$');
 
   static bool _isFilePath(String s) => _regexpFilePath.hasMatch(s);
 
